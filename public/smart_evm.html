@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>EVM Simulator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    .evm-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+
+    .candidate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .led {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #444;
+      margin-bottom: 10px;
+      transition: background 0.3s;
+    }
+
+    .led.on {
+      background: green;
+    }
+
+    .button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>EVM Simulator</h1>
+  <div class="evm-container" id="evmContainer"></div>
+
+  <!-- ✅ Use Socket.IO v4 client -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <script>
+    const NUM_PINS = 8;
+    const espId = "NVEM1234";
+    const evmContainer = document.getElementById('evmContainer');
+    const leds = [];
+    const buttons = [];
+
+    let selectedCandidate = -1;
+    let currentPins = Array(NUM_PINS).fill(0);
+
+    // Create buttons and LEDs
+    for (let i = 0; i < NUM_PINS; i++) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'candidate';
+
+      const led = document.createElement('div');
+      led.className = 'led';
+      leds.push(led);
+
+      const btn = document.createElement('button');
+      btn.textContent = `Candidate ${i + 1}`;
+      btn.className = 'button';
+      btn.disabled = true;
+      buttons.push(btn);
+
+      btn.addEventListener('click', () => {
+        if (selectedCandidate === -1) {
+          selectedCandidate = i;
+          updateLEDs();
+          emitVote(i);
+        }
+      });
+
+      wrapper.appendChild(led);
+      wrapper.appendChild(btn);
+      evmContainer.appendChild(wrapper);
+    }
+
+    console.log("connecting...");
+
+    // ✅ Socket.IO v4 connection
+const socket = io("http://127.0.0.1:5000/admin-socket-route", {
+  auth: {
+    token: "Bearer " + localStorage.getItem("evm.token")
+  }
+});
+
+
+    socket.on("connect_error", (error) => {
+      console.error("❌ connect_error:", error.message);
+    });
+
+    socket.on("error", (error) => {
+      console.error("⚠️ socket error:", error);
+    });
+
+    socket.on("connect_timeout", (timeout) => {
+      console.warn("⏰ Connection timed out:", timeout);
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ Connected");
+      socket.emit("post-connection", { espId: espId });
+    });
+
+    socket.on("check-presence", (_) => {
+      console.log("present");
+      socket.emit("present", { room: espId, role: "esp" });
+    });
+
+    socket.on("change-config", (data) => {
+      const pinBits = JSON.parse(data.pin_bits);
+      console.log("Received pin_bits:", pinBits);
+      socket.emit("config-changed", pinBits);
+      socket.emit("start-election", { espId });
+      currentPins = pinBits;
+      updateButtonStates();
+      resetLEDs();
+    });
+
+    socket.on("vote-updated", () => {
+      console.log("Vote updated, resetting...");
+      resetSelection();
+    });
+
+    socket.on("reset-selected", () => {
+      console.log("Reset selected triggered.");
+      resetSelection();
+    });
+
+    function emitVote(index) {
+      console.log("Vote for candidate:", index);
+      socket.emit("vote-selected", { espId, voteIndex: String(index) });
+    }
+
+    function updateButtonStates() {
+      for (let i = 0; i < NUM_PINS; i++) {
+        buttons[i].disabled = currentPins[i] === 0;
+      }
+    }
+
+    function updateLEDs() {
+      for (let i = 0; i < NUM_PINS; i++) {
+        leds[i].classList.toggle('on', i === selectedCandidate);
+      }
+    }
+
+    function resetLEDs() {
+      leds.forEach(led => led.classList.remove('on'));
+    }
+
+    function resetSelection() {
+      selectedCandidate = -1;
+      resetLEDs();
+    }
+  </script>
+</body>
+
+</html>

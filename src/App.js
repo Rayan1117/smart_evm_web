@@ -1,25 +1,49 @@
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import AuthGuard from "./auth/auth.guard";
+import LoginPage from "./auth/LoginPage";
+import ElectionsPage from "./elections/ElectionsPage";
+import CreateElectionPage from "./elections/CreateElectionPage";
+import CreateConfigPage from "./configs/CreateConfigPage";
+import ConfigListPage from "./configs/ConfigListPage";
+import ElectionStatsPage from "./elections/ElectionStatsPage";
+import ElectionResetPage from "./election-reset/ElectionResetPage";
+import { createContext, useEffect, useState } from "react";
+import ElectionResultPage from "./elections/ElectionResultPage";
+
+export const UserContext = createContext(null);
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    const [role, setRole] = useState(null);
+
+    useEffect(() => {
+        const savedRole = localStorage.getItem("evm.role");
+        if (savedRole) setRole(savedRole);
+    }, []);
+
+    useEffect(() => {
+        if (role) {
+            localStorage.setItem("evm.role", role);
+        } else {
+            localStorage.removeItem("evm.role");
+        }
+    }, [role]);
+
+    return (
+        <UserContext.Provider value={{ role, setRole }}>
+            <Router>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/" element={<AuthGuard><ElectionsPage /></AuthGuard>} />
+                    <Route path="/create-election" element={<CreateElectionPage />} />
+                    <Route path="/create-config" element={<CreateConfigPage />} />
+                    <Route path="/configs" element={<ConfigListPage />} />
+                    <Route path="/election-stat/:electionId" element={<ElectionStatsPage />} />
+                    <Route path="/election-reset" element={<ElectionResetPage />} />
+                    <Route path="/election-result/:electionId" element={<ElectionResultPage />} />
+                </Routes>
+            </Router>
+        </UserContext.Provider>
+    );
 }
 
 export default App;
