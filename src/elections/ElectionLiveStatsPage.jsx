@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import io from "socket.io-client";
 
@@ -6,34 +6,63 @@ export default function ElectionLiveStatsPage() {
     const { electionId } = useParams();
     const [candidates, setCandidates] = useState([]);
     const [groups, setGroups] = useState([]);
-    const [groupPins, setGroupPins] = useState([]); // track candidate → group mapping
-    const socketRef = useRef();
+    const [groupPins, setGroupPins] = useState([]); // track group mapping
 
     useEffect(() => {
-        // --- Initialize socket ---
+        // --- SOCKET SETUP ---
         const socket = io("http://localhost:5000/live-election", {
             query: { token: "Bearer " + localStorage.getItem("evm.token") }
         });
-        socketRef.current = socket;
 
         socket.on("connect", () => {
             console.log("Connected to user namespace");
             socket.emit("join-election-room", { electionId });
         });
 
-        // --- Initial fetch of votes ---
-        const fetchInitialData = async () => {
+        // --- VOTE UPDATE HANDLER ---
+        socket.on("vote-updated", (data) => {
+            console.log("Live vote update received:", data);
+
+            // Expect backend to send absolute votes:
+            // { candidates: ["Alice","Bob"], votes: [5,2], group_pins: [1,1] }
+            if (!data.candidates || !data.votes || !data.group_pins) return;
+
+            const candidateList = data.candidates.map((name, idx) => ({
+                name,
+                votes: data.votes[idx] || 0
+            }));
+            setCandidates(candidateList);
+
+            // Save group mapping
+            setGroupPins(data.group_pins);
+
+            // Compute group votes
+            const groupedCount = {};
+            data.group_pins.forEach((grp, idx) => {
+                groupedCount[grp] = (groupedCount[grp] || 0) + (data.votes[idx] || 0);
+            });
+            const groupList = Object.entries(groupedCount).map(([groupId, votes]) => ({
+                id: groupId,
+                name: `Group ${groupId}`,
+                votes
+            }));
+            setGroups(groupList);
+        });
+
+        // --- INITIAL FETCH ---
+        const fetchVoteData = async () => {
             try {
                 const res = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
-                    headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
+                    headers: {
+                        "authorization": "Bearer " + localStorage.getItem("evm.token")
+                    }
                 });
                 const data = await res.json();
-                if (!data || data.length === 0) return;
+                if (!data[0]) return;
 
-                const election = data[0];
-                const candidateNames = JSON.parse(election.candidates || "[]");
-                const voteCounts = JSON.parse(election.vote_count || "[]");
-                const groupsData = JSON.parse(election.group_pins || "[]");
+                const voteCounts = JSON.parse(data[0].vote_count || "[]");
+                const candidateNames = JSON.parse(data[0].candidates || "[]");
+                const groupsData = JSON.parse(data[0].group_pins || "[]");
 
                 setGroupPins(groupsData);
 
@@ -45,53 +74,27 @@ export default function ElectionLiveStatsPage() {
                 setCandidates(candidateList);
 
                 // Groups
-                const groupMap = {};
+                const groupedCount = {};
                 groupsData.forEach((grp, idx) => {
-                    groupMap[grp] = (groupMap[grp] || 0) + (voteCounts[idx] || 0);
+                    groupedCount[grp] = (groupedCount[grp] || 0) + (voteCounts[idx] || 0);
                 });
-                const groupList = Object.entries(groupMap).map(([id, votes]) => ({
-                    id,
-                    name: `Group ${id}`,
+                const groupList = Object.entries(groupedCount).map(([groupId, votes]) => ({
+                    id: groupId,
+                    name: `Group ${groupId}`,
                     votes
                 }));
                 setGroups(groupList);
 
             } catch (err) {
-                console.error("Failed to fetch initial data:", err);
+                console.error("Failed to fetch initial vote data:", err);
             }
         };
 
-        fetchInitialData();
+        fetchVoteData();
 
-        // --- Listen for live vote updates ---
-        socket.on("vote-updated", (data) => {
-            console.log("Vote update received:", data);
-
-            // Determine votes increment
-            const updatedVotes = data.updatedVotes || data.votes;
-            if (!updatedVotes) return;
-
-            // Update candidates
-            setCandidates(prev => prev.map((c, idx) => {
-                const delta = updatedVotes[idx];
-                if (delta !== undefined) return { ...c, votes: c.votes + delta };
-                return c;
-            }));
-
-            // Update groups
-            setGroups(prev => prev.map(g => {
-                let deltaSum = 0;
-                Object.entries(updatedVotes).forEach(([idxStr, delta]) => {
-                    const idx = parseInt(idxStr, 10);
-                    if (groupPins[idx] === g.id) deltaSum += delta;
-                });
-                if (deltaSum > 0) return { ...g, votes: g.votes + deltaSum };
-                return g;
-            }));
-        });
-
+        // Cleanup
         return () => socket.disconnect();
-    }, [electionId, groupPins]);
+    }, [electionId]);
 
     return (
         <div className="min-h-screen bg-gray-100 p-6">
@@ -118,7 +121,7 @@ export default function ElectionLiveStatsPage() {
                         {groups.map((g, idx) => (
                             <div key={idx} className="p-4 bg-green-100 rounded-xl shadow">
                                 <p className="text-lg font-medium">{g.name}</p>
-                                <p className="text-sm text-gray-700">Votes: {g.votes}</p>
+                                <p className="text-sm text-gray-700">Group Votes: {g.votes}</p>
                             </div>
                         ))}
                     </div>

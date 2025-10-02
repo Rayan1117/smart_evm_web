@@ -5,7 +5,7 @@ import ElectionsPage from "./elections/ElectionsPage";
 import CreateElectionPage from "./elections/CreateElectionPage";
 import CreateConfigPage from "./configs/CreateConfigPage";
 import ConfigListPage from "./configs/ConfigListPage";
-import ElectionStatsPage from "./elections/ElectionStatsPage";
+import ElectionLiveStatsPage from "./elections/ElectionLiveStatsPage";
 import ElectionResetPage from "./election-reset/ElectionResetPage";
 import { createContext, useEffect, useState } from "react";
 import ElectionResultPage from "./elections/ElectionResultPage";
@@ -37,8 +37,8 @@ function App() {
                     <Route path="/create-election" element={<CreateElectionPage />} />
                     <Route path="/create-config" element={<CreateConfigPage />} />
                     <Route path="/configs" element={<ConfigListPage />} />
-                    <Route path="/election-stat/:electionId" element={<ElectionStatsPage />} />
-                    <Route path="/election-reset" element={<ElectionResetPage />} />
+                    <Route path="/election-live-stats/:electionId" element={<ElectionLiveStatsPage />} />
+                    <Route path="/election-reset/:flag" element={<ElectionResetPage />} />
                     <Route path="/election-result/:electionId" element={<ElectionResultPage />} />
                 </Routes>
             </Router>

@@ -16,7 +16,7 @@
       color: #333;
     }
 
-    .evm-container {
+    .evm-container {  
       display: flex;
       flex-wrap: wrap;
       gap: 20px;
@@ -121,11 +121,36 @@ const socket = io("http://127.0.0.1:5000/admin-socket-route", {
     socket.on("connect_timeout", (timeout) => {
       console.warn("⏰ Connection timed out:", timeout);
     });
+socket.on("connect", async () => {
+  console.log("✅ Connected");
+  socket.emit("post-connection", { espId: espId });
 
-    socket.on("connect", () => {
-      console.log("✅ Connected");
-      socket.emit("post-connection", { espId: espId });
+  try {
+    // 🔹 Fetch current config from backend startup handler
+    const res = await fetch(`http://127.0.0.1:5000/startup/get-config?espId=${espId}`, {
+      headers: { "Authorization": "Bearer " + localStorage.getItem("evm.token") }
     });
+
+    if (!res.ok) throw new Error("Failed to fetch config");
+
+    const data = await res.json();
+    const pinBits = JSON.parse(data.pin_bits);
+
+    console.log("📥 Startup config received:", pinBits);
+
+    currentPins = pinBits;
+    updateButtonStates();
+    resetLEDs();
+
+    // 🔹 Let backend know we are aligned
+    socket.emit("config-changed", pinBits);
+    socket.emit("start-election", { espId });
+
+  } catch (err) {
+    console.error("❌ Failed to sync config on startup:", err.message);
+  }
+});
+
 
     socket.on("check-presence", (_) => {
       console.log("present");

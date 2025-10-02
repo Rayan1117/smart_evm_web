@@ -1,85 +1,87 @@
-import { Button, List, Modal } from 'antd'
-import React, { useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { UserContext } from '../../App'
+import { Button, List, Modal } from 'antd';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
-function ElectionDetailsModal(props) {
+export default function ElectionDetailsModal({ election, trigger, ongoingElectionId }) {
+  const navigate = useNavigate();
 
-  const userProvider = useContext(UserContext)
-
-  const navigator = useNavigate()
+  if (!election) return null;
 
   const shapeOptions = [
     { id: 1, name: 'Circle', icon: '⚪' },
     { id: 2, name: 'Square', icon: '⬛' },
     { id: 3, name: 'Triangle', icon: '🔺' },
     { id: 4, name: 'Star', icon: '⭐' },
-    { id: 5, name: 'Heart', icon: '❤️' },
-    { id: 6, name: 'Diamond', icon: '💎' },
-    { id: 7, name: 'Clover', icon: '🍀' },
-    { id: 8, name: 'Moon', icon: '🌙' },
-  ]
+  ];
 
-  const { electionId, electionName, candidateNames, isCurr, isEnd } = props.data.data
+  // safely parse JSON fields
+  let candidateNames = [];
+  let pinBits = [];
+  let groupPins = [];
+  try {
+    candidateNames = JSON.parse(election.candidates || '[]');
+    pinBits = JSON.parse(election.pin_bits || '[]');
+    groupPins = JSON.parse(election.group_pins || '[]');
+  } catch (err) {
+    console.error("Error parsing election JSON fields:", err);
+  }
 
-  console.log(props.data.data);
-
-
-  const pinBits = JSON.parse(props.data.data.pinFlags || '[]')
-  const groupPins = JSON.parse(props.data.data.groupPins || '[]')
-
-  const mappedCandidates = []
-  let candidateIdx = 0
-
+  // Map candidates with pinBits & groupPins
+  const mappedCandidates = [];
+  let candidateIdx = 0;
   for (let i = 0; i < pinBits.length; i++) {
     if (pinBits[i] === 1) {
-      const name = candidateNames[candidateIdx]
-      const shapeId = groupPins[i] // note: indexed by pin position
-      const shape = shapeOptions.find(s => s.id === shapeId)
       mappedCandidates.push({
-        name,
-        shape: shape?.icon ?? '❓',
-      })
-      candidateIdx++
+        name: candidateNames[candidateIdx] || 'N/A',
+        shape: shapeOptions.find(s => s.id === groupPins[i])?.icon || '❓'
+      });
+      candidateIdx++;
     }
   }
 
-  console.log(isCurr);
-
-  console.log(userProvider);
-  
+  const isOngoing = election.election_id === ongoingElectionId;
 
   return (
     <Modal
-      open={props.data.isOpen}
-      width={1000}
-      onCancel={() => props.trigger({ data: null, isOpen: false })}
-      footer={isEnd ? [
-        <Button onClick={() => navigator(`/election-stat/${electionId}`)}>view stats</Button>
-      ] : isCurr ? [userProvider.role === "admin" && <Button onClick={() => navigator(`/election-reset/?electionId=${electionId}`)}>Participate</Button>, <Button>view live voting</Button>] : [userProvider.role === "admin" && isCurr?<Button>continue election</Button>:<Button onClick={() => navigator(`/election-reset/?electionId=${electionId}`)}>start election</Button>]}
+      open={true}
+      onCancel={() => trigger({ isOpen: false, election: null })}
+      width={800}
+      footer={
+        <>
+          {isOngoing ? (
+            <>
+              <Button
+                type="primary"
+                onClick={() => navigate(`/election-reset/1/?electionId=${election.election_id}`)}
+              >
+                Resume Election
+              </Button>
+              <Button onClick={() => navigate("/election-live-stats/" + election.election_id)}>View Live Election</Button>
+            </>
+          ) : election.isEnd ? (
+            <Button onClick={() => navigate("/election-result/" + election.election_id)}>View Result</Button>
+          ) : (
+            <Button
+              type="primary"
+              disabled={!!ongoingElectionId}
+              onClick={() => navigate(`/election-reset/0/?electionId=${election.election_id}`)}
+            >
+              Start Election
+            </Button>
+          )}
+        </>
+      }
     >
-      <div className="flex flex-col gap-5">
-        <h1 className="text-xl font-bold text-blue-800">
-          Election: {electionName}
-        </h1>
-
-        <div className="flex justify-center">
-          <ol>
-            <h2 className="border-b-2 mb-3 text-lg">Candidates & Groups</h2>
-            <List
-              dataSource={mappedCandidates}
-              renderItem={(item, idx) => (
-                <li key={idx} className="text-base">
-                  {item.name}
-                  <span className="ml-2 text-gray-600">{item.shape}</span>
-                </li>
-              )}
-            />
-          </ol>
-        </div>
-      </div>
+      <h2 className="text-xl font-bold mb-4">{election.election_name}</h2>
+      <List
+        header={<div>Candidates & Groups</div>}
+        dataSource={mappedCandidates}
+        renderItem={(item, idx) => (
+          <List.Item key={idx}>
+            {item.name} <span className="ml-2">{item.shape}</span>
+          </List.Item>
+        )}
+      />
     </Modal>
-  )
+  );
 }
-
-export default ElectionDetailsModal

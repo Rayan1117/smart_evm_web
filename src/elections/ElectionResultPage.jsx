@@ -1,83 +1,96 @@
 import { Header } from 'antd/es/layout/layout'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { io } from "socket.io-client";
 
 function ElectionResultPage() {
     const { electionId } = useParams()
     const [electionName, setElectionName] = useState("")
-    const [electionResult, setElectionResult] = useState([])
+    const [results, setResults] = useState([])
+    const [groupResults, setGroupResults] = useState([])
 
     useEffect(() => {
-        async function getElectionResults() {
-            const response = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
-                headers: {
-                    "Authorization": "Bearer " + localStorage.getItem("evm.token")
-                }
-            })
+        async function fetchResults() {
+            try {
+                const response = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
+                    headers: { "Authorization": "Bearer " + localStorage.getItem("evm.token") }
+                })
 
-            if (response.ok) {
+                if (!response.ok) throw new Error("Failed to fetch vote data")
                 const body = await response.json()
-                console.log(body[0]);
-                
-                setElectionName(body[0].election_name || "")
-                setElectionResult(JSON.parse(body[0].vote_count) || [])
-            } else {
-                const errorBody = await response.json()
-                setElectionName("")
-                setElectionResult([])
-                console.error(errorBody)
+                if (!body || body.length === 0) throw new Error("No vote data found")
+
+                const election = body[0]
+                setElectionName(election.election_name || "Election Result")
+
+                const candidates = JSON.parse(election.candidates || "[]")
+                const voteCount = JSON.parse(election.vote_count || "[]")
+                const groupPins = JSON.parse(election.group_pins || "[]")
+
+                // Candidate results
+                const voteResults = candidates.map((candidate, idx) => ({
+                    candidateName: candidate,
+                    group: groupPins[idx],
+                    votes: voteCount[idx] || 0
+                }))
+                setResults(voteResults)
+
+                // Group aggregation
+                const groupMap = {}
+                voteResults.forEach(vr => {
+                    if (!groupMap[vr.group]) groupMap[vr.group] = 0
+                    groupMap[vr.group] += vr.votes
+                })
+                const groupList = Object.entries(groupMap).map(([groupId, votes]) => ({
+                    id: groupId,
+                    name: `Group ${groupId}`,
+                    votes
+                }))
+                setGroupResults(groupList)
+
+            } catch (err) {
+                console.error("Failed to fetch vote data:", err.message)
+                setElectionName("Election Result")
+                setResults([])
+                setGroupResults([])
             }
         }
 
-        getElectionResults()
-
-        const socket = io("http://localhost:5000/live-election", {
-            auth: {
-                token: "Bearer " + localStorage.getItem("evm.token")
-            }
-        });
-
-        socket.on("connect", () => {
-            console.log("Connected to live results");
-        });
-
-        socket.on("voteUpdate", (updatedResults) => {
-            setElectionName(updatedResults.electionName || "")
-            setElectionResult(updatedResults.results || [])
-        });
-
-        return () => {
-            socket.disconnect()
-        }
+        fetchResults()
     }, [electionId])
 
     return (
-        <div>
-            <Header>{electionName || "Election Result"}</Header>
-            <div style={{ padding: "1rem" }}>
-                {electionResult.length === 0 ? (
-                    <p>No results yet</p>
-                ) : (
-                    <table border="1" cellPadding="8" style={{ borderCollapse: "collapse", width: "100%" }}>
-                        <thead>
-                            <tr>
-                                <th>Candidate</th>
-                                <th>Group</th>
-                                <th>Votes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {electionResult.map((candidate, index) => (
-                                <tr key={index}>
-                                    <td>{candidate.candidateName}</td>
-                                    <td>{candidate.group}</td>
-                                    <td>{candidate.votes}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+        <div className="min-h-screen bg-gray-100 p-6">
+            <Header className='!bg-blue-500 !text-white !font-bold !text-xl text-center'>
+                {electionName}
+            </Header>
+
+            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-10 mt-6">
+                {/* Candidates */}
+                <div>
+                    <h2 className="text-xl font-semibold mb-4 text-gray-700">🧑‍💼 Candidates</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {results.map((c, idx) => (
+                            <div key={idx} className="p-4 bg-blue-100 rounded-xl shadow">
+                                <p className="text-lg font-medium">{c.candidateName}</p>
+                                <p className="text-sm text-gray-700">Group: {c.group}</p>
+                                <p className="text-sm text-gray-700">Votes: {c.votes}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Groups */}
+                <div>
+                    <h2 className="text-xl font-semibold mb-4 text-gray-700">🟢 Groups</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {groupResults.map((g, idx) => (
+                            <div key={idx} className="p-4 bg-green-100 rounded-xl shadow">
+                                <p className="text-lg font-medium">{g.name}</p>
+                                <p className="text-sm text-gray-700">Votes: {g.votes}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     )
