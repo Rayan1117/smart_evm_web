@@ -1,129 +1,374 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import io from "socket.io-client";
+import { Modal } from 'antd';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ConfigPresetModal from './components/ConfigPresetModal';
 
-export default function ElectionLiveStatsPage() {
-    const { electionId } = useParams();
-    const [candidates, setCandidates] = useState([]);
-    const [groups, setGroups] = useState([]);
-    const [groupPins, setGroupPins] = useState([]); // track candidate → group mapping
-    const socketRef = useRef();
+const shapeOptions = [
+  { id: 1, name: 'Circle', icon: '⚪' },
+  { id: 2, name: 'Square', icon: '⬛' },
+  { id: 3, name: 'Triangle', icon: '🔺' },
+  { id: 4, name: 'Star', icon: '⭐' },
+];
 
-    useEffect(() => {
-        // --- Initialize socket ---
-        const socket = io("http://localhost:5000/live-election", {
-            query: { token: "Bearer " + localStorage.getItem("evm.token") }
-        });
-        socketRef.current = socket;
+export default function ElectionForm() {
+  const navigator = useNavigate();
+  const [tab, setTab] = useState('manual');
+  const [electionName, setElectionName] = useState('');
+  const [candidates, setCandidates] = useState([
+    { name: '', shapeId: 1 },
+    { name: '', shapeId: 2 },
+  ]);
+  const [pinBits, setPinBits] = useState([1, 1, 0, 0, 0, 0, 0, 0]);
+  const [presetConfigs, setPresetConfigs] = useState([]);
+  const [configName, setConfigName] = useState('');
+  const [configLocked, setConfigLocked] = useState(false);
+  const [originalPreset, setOriginalPreset] = useState(null);
 
-        socket.on("connect", () => {
-            console.log("Connected to user namespace");
-            socket.emit("join-election-room", { electionId });
-        });
+  useEffect(() => {
+    fetch("http://localhost:5000/utils/get-all-configs", {
+      headers: {
+        "Authorization": "Bearer " + localStorage.getItem("evm.token")
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        const parsed = data.configs.map(cfg => ({
+          id: cfg.config_id,
+          name: cfg.config_name,
+          pinBits: JSON.parse(cfg.pin_bits),
+          groupPins: JSON.parse(cfg.group_pins)
+        }));
+        setPresetConfigs(parsed);
+      })
+      .catch(err => console.error("Failed to load presets", err));
+  }, []);
 
-        // --- Initial fetch of votes ---
-        const fetchInitialData = async () => {
-            try {
-                const res = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
-                    headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
-                });
-                const data = await res.json();
-                if (!data || data.length === 0) return;
+  const togglePinBit = (index) => {
+    const updated = [...pinBits];
+    updated[index] = updated[index] ? 0 : 1;
+    setPinBits(updated);
 
-                const election = data[0];
-                const candidateNames = JSON.parse(election.candidates || "[]");
-                const voteCounts = JSON.parse(election.vote_count || "[]");
-                const groupsData = JSON.parse(election.group_pins || "[]");
+    if (originalPreset) {
+      setConfigLocked(false);
+      setOriginalPreset(null);
+      setConfigName('');
+    }
+  };
 
-                setGroupPins(groupsData);
+  const handleAddCandidate = () => {
+    if (candidates.length < 8) {
+      // assign next group 1-4
+      const nextGroup = (candidates.length % 4) + 1;
+      setCandidates([...candidates, { name: '', shapeId: nextGroup }]);
 
-                // Candidates
-                const candidateList = candidateNames.map((name, idx) => ({
-                    name,
-                    votes: voteCounts[idx] || 0
-                }));
-                setCandidates(candidateList);
+      const updatedPinBits = [...pinBits];
+      const nextOffIndex = updatedPinBits.indexOf(0);
+      if (nextOffIndex !== -1) updatedPinBits[nextOffIndex] = 1;
+      setPinBits(updatedPinBits);
 
-                // Groups
-                const groupMap = {};
-                groupsData.forEach((grp, idx) => {
-                    groupMap[grp] = (groupMap[grp] || 0) + (voteCounts[idx] || 0);
-                });
-                const groupList = Object.entries(groupMap).map(([id, votes]) => ({
-                    id,
-                    name: `Group ${id}`,
-                    votes
-                }));
-                setGroups(groupList);
+      if (originalPreset) {
+        setConfigLocked(false);
+        setOriginalPreset(null);
+        setConfigName('');
+      }
+    }
+  };
 
-            } catch (err) {
-                console.error("Failed to fetch initial data:", err);
-            }
-        };
+  const handleRemoveCandidate = () => {
+    if (candidates.length > 2) {
+      const updatedCandidates = candidates.slice(0, -1);
+      setCandidates(updatedCandidates);
 
-        fetchInitialData();
+      const updatedPinBits = [...pinBits];
+      for (let i = 7; i >= 0; i--) {
+        if (updatedPinBits[i] === 1) {
+          updatedPinBits[i] = 0;
+          break;
+        }
+      }
+      setPinBits(updatedPinBits);
 
-        // --- Listen for live vote updates ---
-        socket.on("vote-updated", (data) => {
-            console.log("Vote update received:", data);
+      if (originalPreset) {
+        setConfigLocked(false);
+        setOriginalPreset(null);
+        setConfigName('');
+      }
+    }
+  };
 
-            // Determine votes increment
-            const updatedVotes = data.updatedVotes || data.votes;
-            if (!updatedVotes) return;
+  const updateCandidateShape = (index, shapeId) => {
+    if (shapeId > 4) return; // enforce 4-group max
+    const updated = [...candidates];
+    updated[index].shapeId = shapeId;
+    setCandidates(updated);
 
-            // Update candidates
-            setCandidates(prev => prev.map((c, idx) => {
-                const delta = updatedVotes[idx];
-                if (delta !== undefined) return { ...c, votes: c.votes + delta };
-                return c;
-            }));
+    if (originalPreset) {
+      setConfigLocked(false);
+      setOriginalPreset(null);
+      setConfigName('');
+    }
+  };
 
-            // Update groups
-            setGroups(prev => prev.map(g => {
-                let deltaSum = 0;
-                Object.entries(updatedVotes).forEach(([idxStr, delta]) => {
-                    const idx = parseInt(idxStr, 10);
-                    if (groupPins[idx] === g.id) deltaSum += delta;
-                });
-                if (deltaSum > 0) return { ...g, votes: g.votes + deltaSum };
-                return g;
-            }));
-        });
+  const updateCandidateName = (index, value) => {
+    const updated = [...candidates];
+    updated[index].name = value;
+    setCandidates(updated);
+  };
 
-        return () => socket.disconnect();
-    }, [electionId, groupPins]);
+  const loadPreset = (preset) => {
+    const activeCount = preset.pinBits.filter((b) => b === 1).length;
+    const updatedCandidates = Array(activeCount)
+      .fill(0)
+      .map((_, i) => ({
+        name: candidates[i]?.name || '',
+        shapeId: preset.groupPins[i] || 1
+      }));
+    setCandidates(updatedCandidates);
+    setPinBits(preset.pinBits);
+    setOriginalPreset(preset);
+    setConfigName(preset.name || '');
+    setConfigLocked(true);
+    setTab('manual');
+  };
 
-    return (
-        <div className="min-h-screen bg-gray-100 p-6">
-            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-10">
-                <h1 className="text-3xl font-bold text-center text-gray-800">📊 Election Live Stats</h1>
+  const isSameConfig = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-                {/* Candidates */}
-                <div>
-                    <h2 className="text-xl font-semibold mb-4 text-gray-700">🧑‍💼 Candidates</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {candidates.map((c, idx) => (
-                            <div key={idx} className="p-4 bg-blue-100 rounded-xl shadow">
-                                <p className="text-lg font-medium">{c.name}</p>
-                                <p className="text-sm text-gray-700">Votes: {c.votes}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-                {/* Groups */}
-                <div>
-                    <h2 className="text-xl font-semibold mb-4 text-gray-700">🟢 Groups</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {groups.map((g, idx) => (
-                            <div key={idx} className="p-4 bg-green-100 rounded-xl shadow">
-                                <p className="text-lg font-medium">{g.name}</p>
-                                <p className="text-sm text-gray-700">Votes: {g.votes}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+    const names = candidates.map((c) => c.name.trim()).filter((n) => n !== '');
+    const shapeIds = candidates.map((c) => c.shapeId);
+
+    // 1️⃣ Maximum 4 groups
+    const maxGroupId = Math.max(...shapeIds);
+    if (maxGroupId > 4) {
+      alert('You can only assign candidates to 4 groups (1–4).');
+      return;
+    }
+
+    // 2️⃣ At least one group must have 2 or more candidates
+// 2️⃣ Each group that has candidates must have 2 or more
+const groupCount = {};
+shapeIds.forEach((g) => {
+  groupCount[g] = (groupCount[g] || 0) + 1;
+});
+const allGroupsValid = Object.values(groupCount).every((count) => count >= 2);
+if (!allGroupsValid) {
+  alert('Each group with candidates must have at least 2 candidates.');
+  return;
+}
+
+
+    // 3️⃣ Active buttons validation
+    const activeButtons = pinBits.filter((bit) => bit === 1).length;
+    if (activeButtons !== candidates.length) {
+      alert(`Active buttons (${activeButtons}) must match candidate count (${candidates.length})`);
+      return;
+    }
+
+    const sparseCandidates = Array(8).fill(null);
+    const sparseGroups = Array(8).fill(null);
+    let ci = 0;
+    pinBits.forEach((bit, i) => {
+      if (bit === 1) {
+        sparseCandidates[i] = candidates[ci].name.trim();
+        sparseGroups[i] = candidates[ci].shapeId;
+        ci++;
+      }
+    });
+
+    let configId = null;
+    if (
+      originalPreset &&
+      configLocked &&
+      isSameConfig(pinBits, originalPreset.pinBits) &&
+      isSameConfig(sparseGroups, originalPreset.groupPins)
+    ) {
+      configId = originalPreset.id;
+    } else {
+      if (configName.trim() === '') {
+        alert('Please provide a config name for a custom configuration.');
+        return;
+      }
+
+      const configRes = await fetch('http://localhost:5000/config/create-config', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + localStorage.getItem('evm.token'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: configName,
+          pins: pinBits,
+          grouppins: sparseGroups,
+        }),
+      });
+      const configData = await configRes.json();
+      configId = configData.config_id;
+    }
+
+    fetch('http://localhost:5000/election/create-election', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + localStorage.getItem('evm.token'),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        candidates: JSON.stringify(candidates.map((c) => c.name)),
+        electionName,
+        configId,
+      }),
+    }).then((res) => {
+      if (res.status === 201) {
+        navigator('/');
+      } else {
+        res.json().then((r) => console.log(r));
+      }
+    });
+  };
+
+  const handleCreateWithoutConfig = () => {
+    const electionData = {
+      electionName,
+      candidates: JSON.stringify(candidates.map((c) => c.name)),
+      configId: null,
+    };
+
+    fetch('http://localhost:5000/election/create-election', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + localStorage.getItem('evm.token'),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(electionData),
+    })
+      .then((res) => {
+        if (res.status === 201) {
+          alert('Election created without config!');
+          navigator('/');
+        } else {
+          res.json().then((data) => console.error(data));
+        }
+      })
+      .catch((err) => console.error('Error:', err));
+  };
+
+  return (
+    <div className="max-w-xl mx-auto mt-10 p-6 bg-white rounded shadow">
+      <h1 className="text-xl font-bold mb-4">Create Election</h1>
+
+      <div className="flex justify-center gap-4 mb-6">
+        <button
+          onClick={() => setTab('preset')}
+          className={`px-4 py-2 rounded ${tab === 'preset' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+        >
+          Use Preset
+        </button>
+      </div>
+
+      <ConfigPresetModal tab={tab} presetConfigs={presetConfigs} setTab={setTab} shapeOptions={shapeOptions} setPresetConfigs={setPresetConfigs} loadPreset={loadPreset} />
+
+      <form id='electionForm' onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium mb-1">Election Name</label>
+          <input
+            type="text"
+            value={electionName}
+            onChange={(e) => setElectionName(e.target.value)}
+            className="w-full border border-gray-300 p-2 rounded"
+            required
+          />
         </div>
-    );
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Config Name</label>
+          <input
+            type="text"
+            value={configName}
+            onChange={(e) => setConfigName(e.target.value)}
+            className="w-full border border-gray-300 p-2 rounded"
+            disabled={configLocked}
+            placeholder="Optional (only for custom configs)"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Candidates</label>
+          {candidates.map((candidate, idx) => (
+            <div key={idx} className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={candidate.name}
+                onChange={(e) => updateCandidateName(idx, e.target.value)}
+                placeholder={`Candidate ${idx + 1}`}
+                className="flex-1 border border-gray-300 p-2 rounded"
+                required
+              />
+              <select
+                value={candidate.shapeId}
+                onChange={(e) => updateCandidateShape(idx, parseInt(e.target.value))}
+                className="border border-gray-300 p-2 rounded"
+              >
+                {shapeOptions.filter(s => s.id <= 4).map((shape) => (
+                  <option key={shape.id} value={shape.id}>
+                    {shape.icon} {shape.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+
+          <div className="flex gap-3 mt-2">
+            {candidates.length < 8 && (
+              <button
+                type="button"
+                onClick={handleAddCandidate}
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+              >
+                + Add
+              </button>
+            )}
+            {candidates.length > 2 && (
+              <button
+                type="button"
+                onClick={handleRemoveCandidate}
+                className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+              >
+                − Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">EVM Buttons (Pin Bits)</label>
+          <div className="grid grid-cols-4 gap-2">
+            {pinBits.map((bit, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className={`w-12 h-12 rounded-full text-white font-bold text-lg ${bit ? 'bg-green-600' : 'bg-red-600'}`}
+                onClick={() => togglePinBit(idx)}
+              >
+                {idx + 1}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+        >
+          Create Election
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateWithoutConfig}
+          className="w-full bg-gray-500 text-white py-2 rounded hover:bg-gray-600 scale-[80%]"
+        >
+          Create Without Config
+        </button>
+      </form>
+    </div>
+  );
 }

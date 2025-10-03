@@ -9,47 +9,61 @@ export default function ElectionLiveStatsPage() {
     const [groupPins, setGroupPins] = useState([]); // track group mapping
 
     useEffect(() => {
-        // --- SOCKET SETUP ---
         const socket = io("http://localhost:5000/live-election", {
+            transports: ["websocket"],
             query: { token: "Bearer " + localStorage.getItem("evm.token") }
         });
 
         socket.on("connect", () => {
-            console.log("Connected to user namespace");
+            console.log("✅ Connected to live-election:", socket.id);
             socket.emit("join-election-room", { electionId });
         });
 
-        // --- VOTE UPDATE HANDLER ---
+        socket.on("connect_error", (err) => {
+            console.error("❌ Connection failed:", err.message);
+        });
+
         socket.on("vote-updated", (data) => {
             console.log("Live vote update received:", data);
 
-            // Expect backend to send absolute votes:
-            // { candidates: ["Alice","Bob"], votes: [5,2], group_pins: [1,1] }
-            if (!data.candidates || !data.votes || !data.group_pins) return;
+            if (!data.updatedVotes) return;
+            setCandidates(prev =>
+                prev.map((c, idx) => {
+                    let incremented = false;
 
-            const candidateList = data.candidates.map((name, idx) => ({
-                name,
-                votes: data.votes[idx] || 0
-            }));
-            setCandidates(candidateList);
+                    // iterate over all values in updatedVotes
+                    Object.values(data.updatedVotes).forEach(voteIndex => {
+                        if (idx === voteIndex) {
+                            c.votes += 1;  // increment by 1
+                            incremented = true;
+                        }
+                    });
 
-            // Save group mapping
-            setGroupPins(data.group_pins);
+                    return { ...c };
+                })
+            );
 
-            // Compute group votes
-            const groupedCount = {};
-            data.group_pins.forEach((grp, idx) => {
-                groupedCount[grp] = (groupedCount[grp] || 0) + (data.votes[idx] || 0);
-            });
-            const groupList = Object.entries(groupedCount).map(([groupId, votes]) => ({
-                id: groupId,
-                name: `Group ${groupId}`,
-                votes
-            }));
-            setGroups(groupList);
+            // Update group votes
+            setGroups(prev =>
+                prev.map(g => {
+                    let deltaSum = 0;
+
+                    // Iterate over all updated votes (values = candidate indices)
+                    Object.values(data.updatedVotes).forEach(candidateIdx => {
+                        if (groupPins[candidateIdx] === g.id) {
+                            deltaSum += 1; // increment group vote for each vote
+                        }
+                    });
+
+                    return deltaSum > 0 ? { ...g, votes: g.votes + deltaSum } : g;
+                })
+            );
+
+
         });
 
-        // --- INITIAL FETCH ---
+
+
         const fetchVoteData = async () => {
             try {
                 const res = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
@@ -71,6 +85,8 @@ export default function ElectionLiveStatsPage() {
                     name,
                     votes: voteCounts[idx] || 0
                 }));
+                console.log(candidateList);
+
                 setCandidates(candidateList);
 
                 // Groups
@@ -92,9 +108,9 @@ export default function ElectionLiveStatsPage() {
 
         fetchVoteData();
 
-        // Cleanup
         return () => socket.disconnect();
-    }, [electionId]);
+    }, [electionId]);   // ✅ only depend on electionId
+
 
     return (
         <div className="min-h-screen bg-gray-100 p-6">
