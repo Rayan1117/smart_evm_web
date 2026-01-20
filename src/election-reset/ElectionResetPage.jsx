@@ -35,7 +35,7 @@ function ElectionResetPage() {
 
                 if (!isCurr && flag === "0") {
                     console.log("Starting election…")
-                    await fetch("http://localhost:5000/election/start-election", {
+                    const res = await fetch("http://localhost:5000/election/start-election", {
                         method: "POST",
                         headers: {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
@@ -43,7 +43,12 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
-                    navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
+                    console.log("status :" ,res.status);
+                    
+                    if (res.status == 200) {
+                        navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
+                    }
+                    
                 } 
                 else if (isCurr && flag === "1") {
                     console.log("Resuming election…")
