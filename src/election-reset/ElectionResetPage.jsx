@@ -47,9 +47,6 @@ function ElectionResetPage() {
             console.log("Admin socket connected:", socket.id)
             socket.emit("post-connection", { espId: "NVEM1234", role: "web" })
 
-            // Sync UI after refresh / reconnect
-            await fetchVoteStatus()
-
             try {
                 const res = await fetch(
                     `http://localhost:5000/utils/get-all-elections/?election_id=${electionId}`,
@@ -68,6 +65,8 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
+                    console.log("bro");
+                    
                     if (startRes.status === 200) {
                         navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                     }

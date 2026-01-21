@@ -6,55 +6,72 @@
 
 <style>
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   height: 100vh;
-  background: #e0e0e0;
+  background: #f0f2f5;
+  margin: 0;
 }
 
 .evm-box {
-  width: 280px;
-  height: 460px;
+  width: 360px;
   background: #ffde33;
   border: 4px solid #222;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  padding-left: 40px;
-  box-shadow: 4px 4px 8px rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
 }
 
 .evm-title {
-  font-weight: bold;
-  font-size: 24px;
-  margin-left: 10px;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 16px;
 }
 
 .row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 40px 1fr;
   align-items: center;
-  gap: 40px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
+/* -------- BUTTON -------- */
 .button-dot {
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #111;
   cursor: pointer;
+  box-shadow: 0 3px 0 #000;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 
+.button-dot:active:not(.disabled):not(.locked) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
+}
+
+/* Disabled (gray stays gray) */
 .button-dot.disabled {
   background: #777;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
+/* Locked (clicked) — same color, just unclickable */
+.button-dot.locked {
+  pointer-events: none;
+}
+
+/* -------- LED -------- */
 .led-dot {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #bbb;
   border: 1px solid #999;
@@ -62,13 +79,44 @@ body {
 
 .led-dot.on {
   background: limegreen;
-  box-shadow: 0 0 8px 2px limegreen;
+  box-shadow: 0 0 6px limegreen;
+}
+
+/* -------- LABELS -------- */
+.label-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.candidate-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.category-name {
+  font-size: 12px;
+  color: #555;
 }
 
 .status {
-  position: absolute;
-  bottom: 20px;
-  font-weight: bold;
+  margin-top: 14px;
+  font-weight: 600;
+}
+
+/* -------- CATEGORY SUMMARY -------- */
+.category-summary {
+  margin-top: 20px;
+  width: 360px;
+  background: #fff;
+  padding: 14px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
 }
 </style>
 </head>
@@ -81,77 +129,68 @@ body {
 
 <div class="status" id="statusText">Connecting...</div>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<div class="category-summary" id="categorySummary" style="display:none;">
+  <h3>Category Votes</h3>
+  <div id="categoryList"></div>
+</div>
 
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-/* ---------------- CONFIG ---------------- */
 const NUM_PINS = 8;
 const espId = "NVEM1234";
 
-/* ---------------- DOM ---------------- */
 const evmBox = document.getElementById("evmBox");
 const statusText = document.getElementById("statusText");
+const categorySummary = document.getElementById("categorySummary");
+const categoryList = document.getElementById("categoryList");
 
-/* ---------------- STATE ---------------- */
 let leds = [];
 let buttons = [];
-let currentPins = Array(NUM_PINS).fill(0);
+let currentPins = [];
 let group_pins = [];
-let group_count = 0;
+let candidateNames = [];
+let group_names_map = {};
 let clickedGroups = new Set();
+let categoryVotes = {};
 
-/* ---------------- SOCKET ---------------- */
 const socket = io("http://127.0.0.1:5000/", {
   auth: { token: "Bearer " + localStorage.getItem("evm.token") }
 });
 
 socket.on("connect", async () => {
-  statusText.textContent = "Connected";
-
-  socket.emit("post-connection", { espId, role: "esp" });
-
   const res = await fetch(
     `http://127.0.0.1:5000/startup/get-config?espId=${espId}`,
-    {
-      headers: {
-        Authorization: "Bearer " + localStorage.getItem("evm.token")
-      }
-    }
+    { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
   );
 
-  const { pin_bits, group_pins: gp, cached_votes } = await res.json();
+  const {
+    pin_bits,
+    group_pins: gp,
+    cached_votes,
+    candidate_names,
+    group_names
+  } = await res.json();
 
   currentPins = JSON.parse(pin_bits);
   group_pins = JSON.parse(gp);
+  candidateNames = JSON.parse(candidate_names || "[]");
+  group_names_map = JSON.parse(group_names || "{}");
 
   buildUI();
   recoverCachedVotes(cached_votes);
-
-  socket.emit("config-changed", currentPins);
-  socket.emit("start-election", { espId });
+  updateCategoryVotes();
+  updateStatus();
 });
 
-socket.on("change-config", data => {
-  currentPins = data.pin_bits;
-  buildUI();
-});
-
-socket.on("check-presence", () => {
-  socket.emit("present", { room: espId, role: "esp" });
-});
-
-socket.on("vote-updated", resetSelection);
-
-/* ---------------- UI BUILD ---------------- */
+/* ---------- UI BUILD ---------- */
 function buildUI() {
   evmBox.innerHTML = `<div class="evm-title">EVM</div>`;
   leds = [];
   buttons = [];
   clickedGroups.clear();
+  categoryVotes = {};
 
-  const validGroups = group_pins.filter(g => g !== null);
-  group_count = new Set(validGroups).size;
-  updateStatus();
+  let nameIdx = 0;
 
   for (let i = 0; i < NUM_PINS; i++) {
     const row = document.createElement("div");
@@ -159,66 +198,89 @@ function buildUI() {
 
     const btn = document.createElement("div");
     btn.className = "button-dot";
+    buttons.push(btn);
 
     const led = document.createElement("div");
     led.className = "led-dot";
-
     leds.push(led);
-    buttons.push(btn);
+
+    const label = document.createElement("div");
+    label.className = "label-container";
+
+    const candidateText =
+      currentPins[i] === 1 ? candidateNames[nameIdx++] || "-" : "-";
 
     const groupId = group_pins[i];
-    const isDisabled = currentPins[i] === 0 || groupId === null;
+    const categoryText =
+      groupId != null ? group_names_map[String(groupId)] : "-";
 
-    if (isDisabled) {
+    label.innerHTML = `
+      <div class="candidate-name">${candidateText}</div>
+      <div class="category-name">${categoryText}</div>
+    `;
+
+    if (currentPins[i] === 0 || groupId == null) {
       btn.classList.add("disabled");
     } else {
-      btn.addEventListener("click", () => {
+      categoryVotes[groupId] ??= 0;
+
+      btn.onclick = () => {
         if (clickedGroups.has(groupId)) return;
 
         clickedGroups.add(groupId);
         led.classList.add("on");
+        categoryVotes[groupId]++;
+        lockGroup(groupId);
+
+        updateCategoryVotes();
         updateStatus();
 
-        socket.emit("vote-selected", {
-          espId,
-          voteIndex: i
-        });
-      });
+        socket.emit("vote-selected", { espId, voteIndex: i });
+      };
     }
 
-    row.appendChild(btn);
-    row.appendChild(led);
+    row.append(btn, led, label);
     evmBox.appendChild(row);
   }
 }
 
-/* ---------------- RECOVERY (FAULT TOLERANCE) ---------------- */
-function recoverCachedVotes(cachedVotes = []) {
-  if (!cachedVotes || !cachedVotes.length) return;
-
-  cachedVotes.forEach(index => {
-    const groupId = group_pins[index];
-    if (groupId === null) return;
+/* ---------- CACHE RECOVERY ---------- */
+function recoverCachedVotes(cached = []) {
+  cached.forEach(i => {
+    const groupId = group_pins[i];
+    if (groupId == null) return;
 
     clickedGroups.add(groupId);
-    leds[index]?.classList.add("on");
+    categoryVotes[groupId] = (categoryVotes[groupId] || 0) + 1;
+    leds[i]?.classList.add("on");
+    lockGroup(groupId);
   });
-
-  updateStatus();
 }
 
-/* ---------------- HELPERS ---------------- */
-function resetSelection() {
-  clickedGroups.clear();
-  leds.forEach(led => led.classList.remove("on"));
-  updateStatus();
+/* ---------- HELPERS ---------- */
+function lockGroup(groupId) {
+  group_pins.forEach((g, i) => {
+    if (g === groupId) buttons[i]?.classList.add("locked");
+  });
+}
+
+function updateCategoryVotes() {
+  categoryList.innerHTML = "";
+  categorySummary.style.display = "block";
+
+  Object.entries(categoryVotes).forEach(([gid, count]) => {
+    const row = document.createElement("div");
+    row.className = "category-row";
+    row.innerHTML = `
+      <span>${group_names_map[gid]}</span>
+      <strong>${count}</strong>
+    `;
+    categoryList.appendChild(row);
+  });
 }
 
 function updateStatus() {
-  statusText.textContent =
-    group_count === 0
-      ? "No active voting categories"
-      : `Categories voted: ${clickedGroups.size} / ${group_count}`;
+  statusText.textContent = `Categories voted: ${clickedGroups.size}`;
 }
 </script>
 
