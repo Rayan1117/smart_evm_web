@@ -14,6 +14,29 @@ function ElectionResetPage() {
     const socketRef = useRef()
     const navigate = useNavigate()
 
+    // ---------------- FETCH VOTE STATUS ----------------
+    const fetchVoteStatus = async () => {
+        try {
+            const res = await fetch(
+                `http://localhost:5000/startup/vote-status?espId=NVEM1234`,
+                {
+                    headers: {
+                        authorization: "Bearer " + localStorage.getItem("evm.token")
+                    }
+                }
+            )
+            if (!res.ok) {
+                console.error("Vote status fetch failed:", res.status, await res.text());
+                return;
+            }
+            const data = await res.json();
+            setButtonDisabled(!data.flag);
+        } catch (err) {
+            console.error("Vote status fetch failed:", err)
+            setButtonDisabled(true) // safe default
+        }
+    }
+
     useEffect(() => {
         const socket = io("http://localhost:5000/", {
             query: { token: "Bearer " + localStorage.getItem("evm.token") }
@@ -22,8 +45,10 @@ function ElectionResetPage() {
 
         socket.on("connect", async () => {
             console.log("Admin socket connected:", socket.id)
-
             socket.emit("post-connection", { espId: "NVEM1234", role: "web" })
+
+            // Sync UI after refresh / reconnect
+            await fetchVoteStatus()
 
             try {
                 const res = await fetch(
@@ -35,7 +60,7 @@ function ElectionResetPage() {
 
                 if (!isCurr && flag === "0") {
                     console.log("Starting election…")
-                    const res = await fetch("http://localhost:5000/election/start-election", {
+                    const startRes = await fetch("http://localhost:5000/election/start-election", {
                         method: "POST",
                         headers: {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
@@ -43,16 +68,12 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
-                    console.log("status :" ,res.status);
-                    
-                    if (res.status == 200) {
+                    if (startRes.status === 200) {
                         navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                     }
-                    
-                } 
-                else if (isCurr && flag === "1") {
+                } else if (isCurr && flag === "1") {
                     console.log("Resuming election…")
-                    const res2 = await fetch("http://localhost:5000/election/resume-election", {
+                    const resumeRes = await fetch("http://localhost:5000/election/resume-election", {
                         method: "POST",
                         headers: {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
@@ -60,10 +81,13 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
-                    if (res2.status === HttpStatusCode.Ok) console.log("Resume success")
-                    else console.log(await res2.json())
-                }
-                else if (isCurr && flag === "0") {
+                    if (resumeRes.status === HttpStatusCode.Ok) {
+                        console.log("Resume success")
+                        await fetchVoteStatus()
+                    } else {
+                        console.error(await resumeRes.json())
+                    }
+                } else if (isCurr && flag === "0") {
                     navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 }
             } catch (err) {
@@ -71,9 +95,10 @@ function ElectionResetPage() {
             }
         })
 
+        // ---------------- SOCKET EVENTS ----------------
         socket.on("vote-selected", () => setButtonDisabled(false))
         socket.on("reset-selected", () => setButtonDisabled(true))
-        socket.on("vote-updated", () => setButtonDisabled(true))
+        socket.on("vote-updated", () => fetchVoteStatus()) // update from backend
         socket.on("check-presence", (espId) => {
             socket.emit("present", { room: espId, role: "web" })
             console.log("present")
@@ -82,17 +107,19 @@ function ElectionResetPage() {
         return () => socket.disconnect()
     }, [electionId, flag, navigate])
 
+    // ---------------- RESET VOTE ----------------
     const handleResetVote = () => {
         socketRef.current.emit("cast-vote", { espId: "NVEM1234", electionId })
         setButtonDisabled(true)
         alert("Vote reset sent!")
     }
 
+    // ---------------- END ELECTION ----------------
     const handleEndElection = async () => {
         try {
             const res = await fetch(`http://localhost:5000/election/end-election`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     "authorization": "Bearer " + localStorage.getItem("evm.token")
                 },
@@ -116,7 +143,7 @@ function ElectionResetPage() {
             <Header className='!absolute !top-0 !bg-blue-500 !font-bold !text-lg self-center w-full text-center !leading-[60px]'>
                 Reset Page
             </Header>
-            
+
             <Button
                 className='!bg-blue-500 !text-black !w-64 !rounded-full !h-14 disabled:!bg-blue-300 self-center'
                 onClick={handleResetVote}

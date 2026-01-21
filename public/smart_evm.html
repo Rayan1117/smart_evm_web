@@ -6,228 +6,221 @@
 
 <style>
 body {
-  font-family: sans-serif;
-  padding: 20px;
-  background: #f0f0f0;
-  text-align: center;
-}
-
-h1 { color: #333; }
-
-.evm-container {
+  font-family: Arial, sans-serif;
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
   justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #e0e0e0;
 }
 
-.candidate {
+.evm-box {
+  width: 280px;
+  height: 460px;
+  background: #ffde33;
+  border: 4px solid #222;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
+  justify-content: space-around;
+  padding-left: 40px;
+  box-shadow: 4px 4px 8px rgba(0,0,0,0.3);
+}
+
+.evm-title {
+  font-weight: bold;
+  font-size: 24px;
+  margin-left: 10px;
+}
+
+.row {
+  display: flex;
   align-items: center;
+  gap: 40px;
 }
 
-.led {
-  width: 30px;
-  height: 30px;
+.button-dot {
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #444;
-  margin-bottom: 10px;
-  transition: background 0.3s;
-}
-
-.led.on {
-  background: green;
-}
-
-.button {
-  padding: 10px 20px;
-  font-size: 16px;
+  background: #111;
   cursor: pointer;
 }
 
-.button:disabled {
-  background: #ccc;
+.button-dot.disabled {
+  background: #777;
   cursor: not-allowed;
 }
 
+.led-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #bbb;
+  border: 1px solid #999;
+}
+
+.led-dot.on {
+  background: limegreen;
+  box-shadow: 0 0 8px 2px limegreen;
+}
+
 .status {
-  margin-top: 20px;
+  position: absolute;
+  bottom: 20px;
   font-weight: bold;
 }
 </style>
 </head>
 
 <body>
-<h1>EVM Simulator</h1>
-<div class="evm-container" id="evmContainer"></div>
-<div class="status" id="statusText"></div>
+
+<div class="evm-box" id="evmBox">
+  <div class="evm-title">EVM</div>
+</div>
+
+<div class="status" id="statusText">Connecting...</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script>
+/* ---------------- CONFIG ---------------- */
 const NUM_PINS = 8;
 const espId = "NVEM1234";
 
-const evmContainer = document.getElementById("evmContainer");
+/* ---------------- DOM ---------------- */
+const evmBox = document.getElementById("evmBox");
 const statusText = document.getElementById("statusText");
 
+/* ---------------- STATE ---------------- */
 let leds = [];
 let buttons = [];
-
-let selectedCandidate = -1;
 let currentPins = Array(NUM_PINS).fill(0);
-
 let group_pins = [];
 let group_count = 0;
 let clickedGroups = new Set();
-let vote_index = [];
 
-// ---------------- SOCKET ----------------
-
+/* ---------------- SOCKET ---------------- */
 const socket = io("http://127.0.0.1:5000/", {
-  auth: {
-    token: "Bearer " + localStorage.getItem("evm.token")
-  }
+  auth: { token: "Bearer " + localStorage.getItem("evm.token") }
 });
 
-socket.on("connect_error", err => console.error("connect_error:", err.message));
-
 socket.on("connect", async () => {
-  console.log("✅ Connected");
+  statusText.textContent = "Connected";
 
   socket.emit("post-connection", { espId, role: "esp" });
 
-  try {
-    const res = await fetch(`http://127.0.0.1:5000/startup/get-config?espId=${espId}`, {
+  const res = await fetch(
+    `http://127.0.0.1:5000/startup/get-config?espId=${espId}`,
+    {
       headers: {
         Authorization: "Bearer " + localStorage.getItem("evm.token")
       }
-    });
+    }
+  );
 
-    const { pin_bits, group_pins: gp } = await res.json();
+  const { pin_bits, group_pins: gp, cached_votes } = await res.json();
 
-    currentPins = JSON.parse(pin_bits);
-    group_pins = JSON.parse(gp);
+  currentPins = JSON.parse(pin_bits);
+  group_pins = JSON.parse(gp);
 
-    buildUI();
-    resetSelection();
+  buildUI();
+  recoverCachedVotes(cached_votes);
 
-    socket.emit("config-changed", currentPins);
-    socket.emit("start-election", { espId });
+  socket.emit("config-changed", currentPins);
+  socket.emit("start-election", { espId });
+});
 
-  } catch (err) {
-    console.error("Startup sync failed:", err.message);
-  }
+socket.on("change-config", data => {
+  currentPins = data.pin_bits;
+  buildUI();
 });
 
 socket.on("check-presence", () => {
   socket.emit("present", { room: espId, role: "esp" });
 });
 
-socket.on("change-config", data => {
-  currentPins = data.pin_bits;
-  buildUI();
-  resetSelection();
-
-  socket.emit("config-changed", currentPins);
-  socket.emit("start-election", { espId });
-});
-
 socket.on("vote-updated", resetSelection);
-socket.on("reset-selected", resetSelection);
 
-// ---------------- UI BUILD ----------------
-
+/* ---------------- UI BUILD ---------------- */
 function buildUI() {
-  evmContainer.innerHTML = "";
+  evmBox.innerHTML = `<div class="evm-title">EVM</div>`;
   leds = [];
   buttons = [];
   clickedGroups.clear();
-  vote_index = [];
 
   const validGroups = group_pins.filter(g => g !== null);
   group_count = new Set(validGroups).size;
-
   updateStatus();
 
   for (let i = 0; i < NUM_PINS; i++) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "candidate";
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const btn = document.createElement("div");
+    btn.className = "button-dot";
 
     const led = document.createElement("div");
-    led.className = "led";
-    leds.push(led);
+    led.className = "led-dot";
 
-    const btn = document.createElement("button");
-    btn.className = "button";
-    btn.textContent = `Candidate ${i + 1}`;
+    leds.push(led);
+    buttons.push(btn);
 
     const groupId = group_pins[i];
     const isDisabled = currentPins[i] === 0 || groupId === null;
 
-    btn.disabled = isDisabled;
+    if (isDisabled) {
+      btn.classList.add("disabled");
+    } else {
+      btn.addEventListener("click", () => {
+        if (clickedGroups.has(groupId)) return;
 
-    if (!isDisabled) {
-btn.addEventListener("click", () => {
-  if (clickedGroups.has(groupId)) return;
+        clickedGroups.add(groupId);
+        led.classList.add("on");
+        updateStatus();
 
-  clickedGroups.add(groupId);
-
-  // Turn LED on
-  leds[i].classList.add("on");
-
-  updateStatus();
-
-  // 🔥 emit for EVERY valid click
-  emitVote(i);
-
-  // lock when all groups voted
-  if (clickedGroups.size === group_count) {
-    selectedCandidate = i;
-  }
-});
-
+        socket.emit("vote-selected", {
+          espId,
+          voteIndex: i
+        });
+      });
     }
 
-    buttons.push(btn);
-    wrapper.appendChild(led);
-    wrapper.appendChild(btn);
-    evmContainer.appendChild(wrapper);
+    row.appendChild(btn);
+    row.appendChild(led);
+    evmBox.appendChild(row);
   }
 }
 
-// ---------------- HELPERS ----------------
+/* ---------------- RECOVERY (FAULT TOLERANCE) ---------------- */
+function recoverCachedVotes(cachedVotes = []) {
+  if (!cachedVotes || !cachedVotes.length) return;
 
-function emitVote(buttonIndex) {
-  console.log("🗳️ Vote emitted:", espId, buttonIndex);
+  cachedVotes.forEach(index => {
+    const groupId = group_pins[index];
+    if (groupId === null) return;
 
-  socket.emit("vote-selected", {
-    espId,
-    voteIndex: buttonIndex
+    clickedGroups.add(groupId);
+    leds[index]?.classList.add("on");
   });
+
+  updateStatus();
 }
 
-
-function resetLEDs() {
-  leds.forEach(led => led.classList.remove("on"));
-}
-
+/* ---------------- HELPERS ---------------- */
 function resetSelection() {
-  selectedCandidate = -1;
   clickedGroups.clear();
-  vote_index = [];
-  resetLEDs();
+  leds.forEach(led => led.classList.remove("on"));
   updateStatus();
 }
 
 function updateStatus() {
-  if (group_count === 0) {
-    statusText.textContent = "No active voting groups";
-  } else {
-    statusText.textContent = `Groups voted: ${clickedGroups.size} / ${group_count}`;
-  }
+  statusText.textContent =
+    group_count === 0
+      ? "No active voting categories"
+      : `Categories voted: ${clickedGroups.size} / ${group_count}`;
 }
 </script>
+
 </body>
 </html>
