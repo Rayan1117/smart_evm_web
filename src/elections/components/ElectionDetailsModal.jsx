@@ -7,33 +7,28 @@ export default function ElectionDetailsModal({ election, trigger, ongoingElectio
 
   if (!election) return null;
 
-  const shapeOptions = [
-    { id: 1, name: 'Circle', icon: '⚪' },
-    { id: 2, name: 'Square', icon: '⬛' },
-    { id: 3, name: 'Triangle', icon: '🔺' },
-    { id: 4, name: 'Star', icon: '⭐' },
-  ];
-
-  // safely parse JSON fields
   let candidateNames = [];
   let pinBits = [];
   let groupPins = [];
+  let groupNames = {};
+
   try {
     candidateNames = JSON.parse(election.candidates || '[]');
     pinBits = JSON.parse(election.pin_bits || '[]');
     groupPins = JSON.parse(election.group_pins || '[]');
-  } catch (err) {
-    console.error("Error parsing election JSON fields:", err);
-  }
+    groupNames = JSON.parse(election.group_names || '{}');
+  } catch (err) {}
 
-  // Map candidates with pinBits & groupPins
+  console.log(election);
+  
+
   const mappedCandidates = [];
   let candidateIdx = 0;
   for (let i = 0; i < pinBits.length; i++) {
     if (pinBits[i] === 1) {
       mappedCandidates.push({
         name: candidateNames[candidateIdx] || 'N/A',
-        shape: shapeOptions.find(s => s.id === groupPins[i])?.icon || '❓'
+        category: groupNames[groupPins[i]] || 'Unknown'
       });
       candidateIdx++;
     }
@@ -72,13 +67,13 @@ export default function ElectionDetailsModal({ election, trigger, ongoingElectio
         </>
       }
     >
-      <h2 className="text-xl font-bold mb-4">{election.election_name}</h2>
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>{election.election_name}</h2>
       <List
-        header={<div>Candidates & Groups</div>}
+        header={<div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Candidates & Categories</div>}
         dataSource={mappedCandidates}
         renderItem={(item, idx) => (
           <List.Item key={idx}>
-            {item.name} <span className="ml-2">{item.shape}</span>
+            {item.name} - <span style={{ fontWeight: 500 }}>{item.category}</span>
           </List.Item>
         )}
       />

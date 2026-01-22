@@ -2,18 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-
 @layer components {
   .input {
-    @apply max-w-screen-md h-10 rounded-full
+    @apply max-w-screen-md h-10 rounded-full border border-gray-300 px-4;
   }
 
   .form {
-    @apply bg-[#2F318D] flex flex-col gap-32 items-center p-10 m-10 rounded-md self-stretch
+    @apply bg-gradient-to-br from-indigo-700 to-purple-700 flex flex-col gap-32 items-center p-10 m-10 rounded-md shadow-lg;
   }
 
   .btn {
-    @apply bg-[#F2B705] w-44 active:!shadow-lg shadow-orange-50 hover:scale-105 hover:!bg-[#F2B705] text-[#2F318D] font-bold hover:!text-[#2F318D]
+    @apply bg-blue-600 w-44 active:!shadow-lg shadow-blue-300 hover:scale-105 hover:!bg-blue-700 text-white font-bold hover:!text-white transition-all;
   }
 
   @keyframes marquee {
@@ -37,9 +36,25 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f5f7;
+}
+
+.App-header {
+  background-color: #1e293b;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: #f8fafc;
+  padding: 2rem;
+}
+
+.App-link {
+  color: #6366f1;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }

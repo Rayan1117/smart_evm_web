@@ -12,7 +12,18 @@ export default function ElectionLiveStatsPage() {
   const candidateNamesRef = useRef([]);
   const pinBitsRef = useRef([]);
   const groupPinsRef = useRef([]);
-  const groupNamesRef = useRef({}); // ✅ NEW
+  const groupNamesRef = useRef({});
+
+  const theme = {
+    bg: '#F9FAFB',
+    cardBg: '#FFFFFF',
+    candidateBg: 'linear-gradient(135deg, #DBEAFE, #EFF6FF)',
+    categoryBg: 'linear-gradient(135deg, #DCFCE7, #ECFDF5)',
+    textPrimary: '#111827',
+    textSecondary: '#4B5563',
+    fontFamily: "'Inter', sans-serif",
+    boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+  };
 
   useEffect(() => {
     const socket = io("http://localhost:5000/live-election", {
@@ -25,54 +36,31 @@ export default function ElectionLiveStatsPage() {
     });
 
     const updateVotes = (voteCounts) => {
-      /* ---------- Candidate votes ---------- */
       const activeCandidates = [];
       let voteIdx = 0;
-
       candidateNamesRef.current.forEach(name => {
-        while (
-          voteIdx < pinBitsRef.current.length &&
-          pinBitsRef.current[voteIdx] === 0
-        ) voteIdx++;
-
+        while (voteIdx < pinBitsRef.current.length && pinBitsRef.current[voteIdx] === 0) voteIdx++;
         if (voteIdx >= voteCounts.length) return;
-
-        activeCandidates.push({
-          name,
-          votes: voteCounts[voteIdx] || 0
-        });
-
+        activeCandidates.push({ name, votes: voteCounts[voteIdx] || 0 });
         voteIdx++;
       });
-
       setCandidates(activeCandidates);
+      setTotalVotes(activeCandidates.reduce((sum, c) => sum + c.votes, 0));
 
-      /* ---------- Total votes ---------- */
-      setTotalVotes(
-        activeCandidates.reduce((sum, c) => sum + c.votes, 0)
-      );
-
-      /* ---------- Category votes ---------- */
       const groupVotesMap = {};
-
       pinBitsRef.current.forEach((pin, i) => {
-        if (pin === 0) return;
-
+        if (!pin) return;
         const grp = groupPinsRef.current[i];
         if (grp == null) return;
-
-        groupVotesMap[grp] =
-          (groupVotesMap[grp] || 0) + (voteCounts[i] || 0);
+        groupVotesMap[grp] = (groupVotesMap[grp] || 0) + (voteCounts[i] || 0);
       });
 
-      const catVotesArray = Object.entries(groupVotesMap).map(
-        ([grp, votes]) => ({
-          name: groupNamesRef.current[String(grp)] || `Category ${grp}`, // ✅ FIX
+      setCategoryVotes(
+        Object.entries(groupVotesMap).map(([grp, votes]) => ({
+          name: groupNamesRef.current[String(grp)] || `Category ${grp}`,
           votes
-        })
+        }))
       );
-
-      setCategoryVotes(catVotesArray);
     };
 
     socket.on("vote-updated", (data) => {
@@ -81,25 +69,16 @@ export default function ElectionLiveStatsPage() {
     });
 
     const fetchVoteData = async () => {
-      const res = await fetch(
-        `http://localhost:5000/utils/get-vote-count/${electionId}`,
-        {
-          headers: {
-            authorization: "Bearer " + localStorage.getItem("evm.token")
-          }
-        }
-      );
-
+      const res = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
+        headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
+      });
       const data = await res.json();
       if (!data[0]) return;
-
       const row = data[0];
-
       candidateNamesRef.current = JSON.parse(row.candidates || "[]");
       pinBitsRef.current = JSON.parse(row.pin_bits || "[]");
       groupPinsRef.current = JSON.parse(row.group_pins || "[]");
-      groupNamesRef.current = JSON.parse(row.group_names || "{}"); // ✅ FIX
-
+      groupNamesRef.current = JSON.parse(row.group_names || "{}");
       updateVotes(JSON.parse(row.vote_count || "[]"));
     };
 
@@ -108,39 +87,34 @@ export default function ElectionLiveStatsPage() {
   }, [electionId]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-10">
-        <h1 className="text-3xl font-bold text-center text-gray-800">
-          📊 Election Live Stats
-        </h1>
+    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, fontFamily: theme.fontFamily, padding: '2rem' }}>
+      <div style={{ maxWidth: '5xl', margin: '0 auto', background: theme.cardBg, borderRadius: '1.5rem', boxShadow: theme.boxShadow, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+        <h1 style={{ fontSize: '2.25rem', fontWeight: 700, textAlign: 'center', color: theme.textPrimary }}>📊 Election Live Stats</h1>
 
-        {/* Candidates */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">🧑‍💼 Candidates</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem', color: theme.textPrimary }}>🧑‍💼 Candidates</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             {candidates.map((c, i) => (
-              <div key={i} className="p-4 bg-blue-100 rounded-xl">
-                <p className="font-semibold">{c.name}</p>
-                <p>Votes: {c.votes}</p>
+              <div key={i} style={{ background: theme.candidateBg, borderRadius: '1rem', padding: '1rem', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
+                <p style={{ fontWeight: 600, color: theme.textPrimary }}>{c.name}</p>
+                <p style={{ color: theme.textSecondary }}>Votes: {c.votes}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Total Votes */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">📈 Total Votes</h2>
-          <p className="text-lg font-bold">{totalVotes}</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem', color: theme.textPrimary }}>📈 Total Votes</h2>
+          <p style={{ fontSize: '1.25rem', fontWeight: 700, color: theme.textPrimary }}>{totalVotes}</p>
         </div>
 
-        {/* Category Votes */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">🏷️ Category Votes</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem', color: theme.textPrimary }}>🏷️ Category Votes</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             {categoryVotes.map((c, i) => (
-              <div key={i} className="p-4 bg-green-100 rounded-xl">
-                <p className="font-semibold">{c.name}</p>
-                <p>Votes: {c.votes}</p>
+              <div key={i} style={{ background: theme.categoryBg, borderRadius: '1rem', padding: '1rem', boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
+                <p style={{ fontWeight: 600, color: theme.textPrimary }}>{c.name}</p>
+                <p style={{ color: theme.textSecondary }}>Votes: {c.votes}</p>
               </div>
             ))}
           </div>

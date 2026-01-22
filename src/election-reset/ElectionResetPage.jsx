@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import io from "socket.io-client"
 
-function ElectionResetPage() {
+export default function ElectionResetPage() {
     const [query] = useSearchParams()
     const { flag } = useParams()
     const [buttonDisabled, setButtonDisabled] = useState(true)
@@ -14,26 +14,28 @@ function ElectionResetPage() {
     const socketRef = useRef()
     const navigate = useNavigate()
 
-    // ---------------- FETCH VOTE STATUS ----------------
+    const theme = {
+        bg: '#F3F4F6',
+        headerBg: 'linear-gradient(90deg, #1E3A8A, #3B82F6)',
+        resetBtnBg: 'linear-gradient(135deg, #3B82F6, #60A5FA)',
+        resetBtnDisabled: '#A5B4FC',
+        endBtnBg: 'linear-gradient(135deg, #EF4444, #F87171)',
+        cardShadow: '0 8px 24px rgba(0,0,0,0.08)',
+        fontFamily: "'Inter', sans-serif",
+        textPrimary: '#111827',
+        textSecondary: '#4B5563'
+    }
+
     const fetchVoteStatus = async () => {
         try {
-            const res = await fetch(
-                `http://localhost:5000/startup/vote-status?espId=NVEM1234`,
-                {
-                    headers: {
-                        authorization: "Bearer " + localStorage.getItem("evm.token")
-                    }
-                }
-            )
-            if (!res.ok) {
-                console.error("Vote status fetch failed:", res.status, await res.text());
-                return;
-            }
-            const data = await res.json();
-            setButtonDisabled(!data.flag);
-        } catch (err) {
-            console.error("Vote status fetch failed:", err)
-            setButtonDisabled(true) // safe default
+            const res = await fetch(`http://localhost:5000/startup/vote-status?espId=NVEM1234`, {
+                headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
+            })
+            if (!res.ok) return
+            const data = await res.json()
+            setButtonDisabled(!data.flag)
+        } catch {
+            setButtonDisabled(true)
         }
     }
 
@@ -44,19 +46,14 @@ function ElectionResetPage() {
         socketRef.current = socket
 
         socket.on("connect", async () => {
-            console.log("Admin socket connected:", socket.id)
             socket.emit("post-connection", { espId: "NVEM1234", role: "web" })
-
             try {
-                const res = await fetch(
-                    `http://localhost:5000/utils/get-all-elections/?election_id=${electionId}`,
-                    { headers: { authorization: "Bearer " + localStorage.getItem("evm.token") } }
-                )
+                const res = await fetch(`http://localhost:5000/utils/get-all-elections/?election_id=${electionId}`, {
+                    headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
+                })
                 const data = await res.json()
                 const isCurr = data?.election_config?.isCurrent
-
                 if (!isCurr && flag === "0") {
-                    console.log("Starting election…")
                     const startRes = await fetch("http://localhost:5000/election/start-election", {
                         method: "POST",
                         headers: {
@@ -65,13 +62,8 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
-                    console.log("bro");
-                    
-                    if (startRes.status === 200) {
-                        navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
-                    }
+                    if (startRes.status === 200) navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 } else if (isCurr && flag === "1") {
-                    console.log("Resuming election…")
                     const resumeRes = await fetch("http://localhost:5000/election/resume-election", {
                         method: "POST",
                         headers: {
@@ -80,40 +72,27 @@ function ElectionResetPage() {
                         },
                         body: JSON.stringify({ electionId, espId: "NVEM1234" })
                     })
-                    if (resumeRes.status === HttpStatusCode.Ok) {
-                        console.log("Resume success")
-                        await fetchVoteStatus()
-                    } else {
-                        console.error(await resumeRes.json())
-                    }
+                    if (resumeRes.status === HttpStatusCode.Ok) await fetchVoteStatus()
                 } else if (isCurr && flag === "0") {
                     navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 }
-            } catch (err) {
-                console.error("Error fetching election:", err)
-            }
+            } catch {}
         })
 
-        // ---------------- SOCKET EVENTS ----------------
         socket.on("vote-selected", () => setButtonDisabled(false))
         socket.on("reset-selected", () => setButtonDisabled(true))
-        socket.on("vote-updated", () => fetchVoteStatus()) // update from backend
-        socket.on("check-presence", (espId) => {
-            socket.emit("present", { room: espId, role: "web" })
-            console.log("present")
-        })
+        socket.on("vote-updated", () => fetchVoteStatus())
+        socket.on("check-presence", (espId) => socket.emit("present", { room: espId, role: "web" }))
 
         return () => socket.disconnect()
     }, [electionId, flag, navigate])
 
-    // ---------------- RESET VOTE ----------------
     const handleResetVote = () => {
         socketRef.current.emit("cast-vote", { espId: "NVEM1234", electionId })
         setButtonDisabled(true)
         alert("Vote reset sent!")
     }
 
-    // ---------------- END ELECTION ----------------
     const handleEndElection = async () => {
         try {
             const res = await fetch(`http://localhost:5000/election/end-election`, {
@@ -138,41 +117,53 @@ function ElectionResetPage() {
     }
 
     return (
-        <div className="flex flex-col justify-center h-screen relative bg-gray-100">
-            <Header className='!absolute !top-0 !bg-blue-500 !font-bold !text-lg self-center w-full text-center !leading-[60px]'>
-                Reset Page
+        <div style={{ minHeight: '100vh', backgroundColor: theme.bg, fontFamily: theme.fontFamily, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem', position: 'relative' }}>
+            <Header style={{ position: 'fixed', top: 0, left: 0, width: '100%', background: theme.headerBg, color: '#FFFFFF', fontWeight: 700, fontSize: '1.5rem', textAlign: 'center', padding: '1rem 0', zIndex: 10 }}>
+                Election Reset Page
             </Header>
 
-            <Button
-                className='!bg-blue-500 !text-black !w-64 !rounded-full !h-14 disabled:!bg-blue-300 self-center'
-                onClick={handleResetVote}
-                disabled={buttonDisabled}>
-                Reset
-            </Button>
+            <div style={{ marginTop: '6rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
+                <Button
+                    style={{
+                        width: '16rem',
+                        height: '3.5rem',
+                        borderRadius: '9999px',
+                        fontWeight: 600,
+                        color: '#FFFFFF',
+                        background: buttonDisabled ? theme.resetBtnDisabled : theme.resetBtnBg,
+                        boxShadow: theme.cardShadow
+                    }}
+                    onClick={handleResetVote}
+                    disabled={buttonDisabled}>
+                    Reset Vote
+                </Button>
+            </div>
 
             <Button
-                className='!bg-red-500 !text-white !w-36 !rounded-full !h-10 fixed bottom-5 right-5'
+                style={{
+                    position: 'fixed',
+                    bottom: '2.5rem',
+                    right: '2.5rem',
+                    width: '12rem',
+                    height: '2.5rem',
+                    borderRadius: '9999px',
+                    fontWeight: 600,
+                    color: '#FFFFFF',
+                    background: theme.endBtnBg,
+                    boxShadow: theme.cardShadow
+                }}
                 onClick={() => setShowConfirm(true)}>
                 End Election
             </Button>
 
-            {/* Custom Confirmation Popup */}
             {showConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                    <div className="bg-white rounded-xl shadow-lg p-6 w-80">
-                        <h2 className="text-lg font-bold mb-4">Confirm End Election</h2>
-                        <p className="mb-6 text-gray-700">Are you sure you want to end this election?</p>
-                        <div className="flex justify-end space-x-4">
-                            <button
-                                className="px-4 py-2 rounded-full bg-gray-300 hover:bg-gray-400"
-                                onClick={() => setShowConfirm(false)}>
-                                No
-                            </button>
-                            <button
-                                className="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600"
-                                onClick={handleEndElection}>
-                                Yes
-                            </button>
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 50 }}>
+                    <div style={{ backgroundColor: '#FFFFFF', borderRadius: '1rem', padding: '2rem', width: '20rem', boxShadow: theme.cardShadow }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', color: theme.textPrimary }}>Confirm End Election</h2>
+                        <p style={{ marginBottom: '1.5rem', color: theme.textSecondary }}>Are you sure you want to end this election?</p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            <button style={{ padding: '0.5rem 1rem', borderRadius: '9999px', backgroundColor: '#E5E7EB', fontWeight: 500 }} onClick={() => setShowConfirm(false)}>No</button>
+                            <button style={{ padding: '0.5rem 1rem', borderRadius: '9999px', backgroundColor: '#EF4444', color: '#FFFFFF', fontWeight: 600 }} onClick={handleEndElection}>Yes</button>
                         </div>
                     </div>
                 </div>
@@ -180,5 +171,3 @@ function ElectionResetPage() {
         </div>
     )
 }
-
-export default ElectionResetPage

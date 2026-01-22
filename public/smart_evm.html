@@ -5,129 +5,192 @@
 <title>EVM Simulator</title>
 
 <style>
+:root {
+  --bg: #f0f2f5;
+  --box-panel: #facc15;   /* yellow box */
+  --box-panel-alt: #f3c623;
+  --box-border: #b59f3b;
+
+  --text-main: #111827;
+  --text-muted: #4b5563;
+  --primary: #1f2937;
+  --accent: #374151;
+
+  --success: #16a34a;
+
+  --button-default: #111111;   /* black button */
+  --button-active: #333333;    /* clicked */
+  --button-disabled: #9ca3af;  /* gray disabled */
+  --button-shadow: #000000aa;  /* shadow for elevation */
+
+  --display-bg: #1e293b;       /* dark display background */
+  --display-text: #f3f4f6;     /* light text for labels */
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  margin: 0;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  background: #f0f2f5;
-  margin: 0;
+  color: var(--text-main);
 }
 
+/* Physical EVM Box */
 .evm-box {
-  width: 360px;
-  background: #ffde33;
-  border: 4px solid #222;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
+  width: 420px;
+  background: linear-gradient(180deg, var(--box-panel), var(--box-panel-alt));
+  border: 2px solid var(--box-border);
+  border-radius: 18px;
+  padding: 26px 24px;
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.3), 
+    inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
+/* Box Title */
 .evm-title {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  color: var(--primary);
 }
 
+/* Candidate row container */
 .row {
   display: grid;
-  grid-template-columns: 40px 40px 1fr;
+  grid-template-columns: 36px 28px 1fr;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 14px;
+  padding: 10px 0;
 }
 
-/* -------- BUTTON -------- */
+/* Button styles */
 .button-dot {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: #111;
+  background: var(--button-default);
   cursor: pointer;
-  box-shadow: 0 3px 0 #000;
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  box-shadow: 0 4px 0 var(--button-shadow), 0 4px 6px rgba(0,0,0,0.35);
+  transition: all 0.1s ease, background 0.2s ease;
 }
 
 .button-dot:active:not(.disabled):not(.locked) {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 #000;
+  box-shadow: 0 2px 0 var(--button-shadow), 0 2px 4px rgba(0,0,0,0.35);
 }
 
-/* Disabled (gray stays gray) */
+.button-dot.locked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .button-dot.disabled {
-  background: #777;
+  background: var(--button-disabled);
   cursor: not-allowed;
   box-shadow: none;
 }
 
-/* Locked (clicked) — same color, just unclickable */
-.button-dot.locked {
-  pointer-events: none;
+.button-dot.clicked {
+  background: var(--button-active);
 }
 
-/* -------- LED -------- */
+/* LED indicators */
 .led-dot {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #bbb;
-  border: 1px solid #999;
+  background: #d1d5db;
+  border: 1px solid #9ca3af;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .led-dot.on {
-  background: limegreen;
-  box-shadow: 0 0 6px limegreen;
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(22,163,74,0.4);
+  border-color: var(--success);
 }
 
-/* -------- LABELS -------- */
+/* Labels like physical display */
 .label-container {
   display: flex;
   flex-direction: column;
+  background: var(--display-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .candidate-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--display-text);
 }
 
 .category-name {
   font-size: 12px;
-  color: #555;
+  color: #cbd5e1;
 }
 
+/* Status text */
 .status {
-  margin-top: 14px;
-  font-weight: 600;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 500;
 }
 
-/* -------- CATEGORY SUMMARY -------- */
+/* Category summary */
 .category-summary {
-  margin-top: 20px;
-  width: 360px;
-  background: #fff;
-  padding: 14px;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  margin-top: 24px;
+  width: 420px;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border: 1px solid #d1d5db;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+.category-summary h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--primary);
 }
 
 .category-row {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
 }
+
+.category-row:last-child {
+  border-bottom: none;
+}
+
+
 </style>
+
+
 </head>
 
 <body>
 
 <div class="evm-box" id="evmBox">
-  <div class="evm-title">EVM</div>
+  <div class="evm-title">Electronic Voting Machine</div>
 </div>
 
-<div class="status" id="statusText">Connecting...</div>
+<div class="status" id="statusText">Connecting…</div>
 
 <div class="category-summary" id="categorySummary" style="display:none;">
   <h3>Category Votes</h3>
@@ -158,6 +221,10 @@ const socket = io("http://127.0.0.1:5000/", {
 });
 
 socket.on("connect", async () => {
+  setTimeout(() => {
+    socket.emit("post-connection", { espId, role: "esp" });
+  }, 50);
+
   const res = await fetch(
     `http://127.0.0.1:5000/startup/get-config?espId=${espId}`,
     { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
@@ -182,9 +249,20 @@ socket.on("connect", async () => {
   updateStatus();
 });
 
-/* ---------- UI BUILD ---------- */
+socket.on("reconnect", () => {
+  socket.emit("post-connection", { espId, role: "esp" });
+});
+
+socket.on("vote-updated", () => {
+  resetVote();
+});
+
+socket.on("check-presence", () => {
+  socket.emit("present", { room: espId, role: "esp" });
+});
+
 function buildUI() {
-  evmBox.innerHTML = `<div class="evm-title">EVM</div>`;
+  evmBox.innerHTML = `<div class="evm-title">Electronic Voting Machine</div>`;
   leds = [];
   buttons = [];
   clickedGroups.clear();
@@ -244,7 +322,6 @@ function buildUI() {
   }
 }
 
-/* ---------- CACHE RECOVERY ---------- */
 function recoverCachedVotes(cached = []) {
   cached.forEach(i => {
     const groupId = group_pins[i];
@@ -257,11 +334,26 @@ function recoverCachedVotes(cached = []) {
   });
 }
 
-/* ---------- HELPERS ---------- */
 function lockGroup(groupId) {
   group_pins.forEach((g, i) => {
     if (g === groupId) buttons[i]?.classList.add("locked");
   });
+}
+
+function resetVote() {
+  clickedGroups.clear();
+
+  Object.keys(categoryVotes).forEach(gid => {
+    categoryVotes[gid] = 0;
+  });
+
+  buttons.forEach((btn, i) => {
+    btn.classList.remove("locked");
+    leds[i]?.classList.remove("on");
+  });
+
+  updateCategoryVotes();
+  updateStatus();
 }
 
 function updateCategoryVotes() {

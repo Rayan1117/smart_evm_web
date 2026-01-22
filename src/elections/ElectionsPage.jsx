@@ -19,38 +19,87 @@ export default function ElectionsPage() {
         const data = await res.json();
         const electionsList = data || [];
         setElections(electionsList);
-
-        // Find ongoing election if exists
         const current = electionsList.find(e => e.isCurrent);
         setOngoingElection(current || null);
       })
-      .catch(err => {
-        console.error(err);
-        setElections([]); // Ensure state is empty on error
-      });
+      .catch(() => setElections([]));
   }, []);
 
-  const openModal = (election) => {
-    setModalData({ isOpen: true, election });
+  const openModal = (election) => setModalData({ isOpen: true, election });
+
+  const theme = {
+    header: '#1C74E9',
+    headerText: '#FFFFFF',
+    cardBg: '#FFFFFF',
+    ongoingCardBg: '#EFF6FF',
+    bg: '#F5F5F5',
+    textPrimary: '#111827',
+    textSecondary: '#4B5563',
+    buttonPrimary: '#1C74E9',
+    buttonText: '#FFFFFF',
+    bannerGradient: 'linear-gradient(145deg, #EFF6FF, #DBEAFE)',
+    bannerBorder: '#1C74E9',
+    cardShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    fontFamily: "'Inter', sans-serif",
   };
 
   return (
-    <div>
-      <Header className='bg-blue-800 font-bold text-lg pt-5 text-yellow-500'>Elections</Header>
+    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, fontFamily: theme.fontFamily }}>
+      <Header
+        style={{
+          background: theme.header,
+          color: theme.headerText,
+          fontSize: '1.75rem',
+          fontWeight: 600,
+          padding: '1rem 2rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: theme.cardShadow,
+          borderBottomLeftRadius: '0.75rem',
+          borderBottomRightRadius: '0.75rem',
+        }}
+      >
+        Elections
+      </Header>
 
-      {/* Running marquee for ongoing election */}
       {ongoingElection && (
         <div
-          className='bg-yellow-500 rounded-md w-1/2 relative left-1/4 overflow-hidden cursor-pointer'
           onClick={() => openModal(ongoingElection)}
+          style={{
+            background: theme.bannerGradient,
+            borderLeft: `4px solid ${theme.bannerBorder}`,
+            boxShadow: theme.cardShadow,
+            borderRadius: '0.5rem',
+            maxWidth: '40rem',
+            margin: '2rem auto',
+            cursor: 'pointer',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            padding: '1.25rem 1.75rem',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = theme.cardShadow;
+          }}
         >
-          <h1 className='animate-marquee text-center select-none'>
-            Currently, an election is ongoing. Click here to view
+          <h1
+            style={{
+              fontSize: '1rem',
+              fontWeight: 500,
+              textAlign: 'center',
+              color: theme.textPrimary,
+              margin: 0,
+            }}
+          >
+            An election is currently ongoing. Click here to view details.
           </h1>
         </div>
       )}
 
-      {/* Election Details Modal */}
       {modalData.isOpen && (
         <ElectionDetailsModal
           election={modalData.election}
@@ -59,25 +108,71 @@ export default function ElectionsPage() {
         />
       )}
 
-      <div className='ml-10 mt-5'>
+      <div style={{ maxWidth: '80rem', margin: '2rem auto', padding: '0 1.5rem' }}>
         {elections.length === 0 ? (
           <Empty description="No elections found in the database." />
         ) : (
-          <List>
-            {elections.map((election, idx) => (
-              <ElectionCard
-                key={idx}
-                election={election}
-                ongoingElectionId={ongoingElection?.election_id || null}
-                openModal={openModal}
-              />
-            ))}
-          </List>
+          <List
+            dataSource={elections}
+            renderItem={(election, idx) => (
+              <div
+                style={{
+                  marginBottom: '1.5rem',
+                  borderRadius: '0.75rem',
+                  background: election.election_id === ongoingElection?.election_id
+                    ? theme.ongoingCardBg
+                    : theme.cardBg,
+                  boxShadow: theme.cardShadow,
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = theme.cardShadow;
+                }}
+              >
+                <ElectionCard
+                  key={idx}
+                  election={election}
+                  ongoingElectionId={ongoingElection?.election_id || null}
+                  openModal={openModal}
+                  theme={theme}
+                />
+              </div>
+            )}
+          />
         )}
       </div>
 
       <Link to="/create-election">
-        <Button className='fixed bottom-10 right-10 rounded-full h-14 w-14 bg-blue-800 text-yellow-50 font-bold hover:scale-105'>+</Button>
+        <Button
+          style={{
+            position: 'fixed',
+            bottom: '2.5rem',
+            right: '2.5rem',
+            height: '3.5rem',
+            width: '3.5rem',
+            borderRadius: '9999px',
+            background: theme.buttonPrimary,
+            color: theme.buttonText,
+            fontWeight: 700,
+            boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.18)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
+          }}
+        >
+          +
+        </Button>
       </Link>
     </div>
   );

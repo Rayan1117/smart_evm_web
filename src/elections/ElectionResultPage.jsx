@@ -2,7 +2,7 @@ import { Header } from 'antd/es/layout/layout';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-function ElectionResultPage() {
+export default function ElectionResultPage() {
   const { electionId } = useParams();
   const [electionName, setElectionName] = useState("");
   const [results, setResults] = useState([]);
@@ -13,13 +13,21 @@ function ElectionResultPage() {
   const pinBitsRef = useRef([]);
   const categoryPinsRef = useRef([]);
 
+  const theme = {
+    bg: '#F3F4F6',
+    headerBg: 'linear-gradient(90deg, #1E3A8A, #3B82F6)',
+    cardShadow: '0 8px 24px rgba(0,0,0,0.08)',
+    fontFamily: "'Inter', sans-serif",
+    textPrimary: '#111827',
+    textSecondary: '#4B5563'
+  }
+
   useEffect(() => {
     async function fetchResults() {
       try {
         const response = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
           headers: { "Authorization": "Bearer " + localStorage.getItem("evm.token") }
         });
-
         if (!response.ok) throw new Error("Failed to fetch vote data");
         const body = await response.json();
         if (!body || body.length === 0) throw new Error("No vote data found");
@@ -36,11 +44,9 @@ function ElectionResultPage() {
         pinBitsRef.current = pinBits;
         categoryPinsRef.current = categoryPins;
 
-        // Assign votes linearly only to active pins
         const activeCandidates = [];
         let voteIdx = 0;
         candidateNames.forEach((name) => {
-          // Skip inactive pins
           while (voteIdx < pinBits.length && pinBits[voteIdx] === 0) voteIdx++;
           if (voteIdx >= voteCount.length) return;
           activeCandidates.push({
@@ -53,11 +59,9 @@ function ElectionResultPage() {
 
         setResults(activeCandidates);
 
-        // Total votes
         const total = activeCandidates.reduce((acc, c) => acc + c.votes, 0);
         setTotalVotes(total);
 
-        // Category-wise aggregation
         const categoryMap = {};
         activeCandidates.forEach(c => {
           if (!categoryMap[c.category]) categoryMap[c.category] = 0;
@@ -68,56 +72,62 @@ function ElectionResultPage() {
           name: `Category ${catId}`,
           votes
         }));
-
         setCategoryResults(categoryList);
 
-      } catch (err) {
-        console.error("Failed to fetch vote data:", err.message);
+      } catch {
         setElectionName("Election Result");
         setResults([]);
         setCategoryResults([]);
         setTotalVotes(0);
       }
     }
-
     fetchResults();
   }, [electionId]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <Header className="!bg-blue-500 !text-white !font-bold !text-xl text-center">
+    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, fontFamily: theme.fontFamily, paddingTop: '5rem', paddingBottom: '2rem' }}>
+      <Header style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        background: theme.headerBg,
+        color: '#FFFFFF',
+        fontWeight: 700,
+        fontSize: '1.5rem',
+        textAlign: 'center',
+        padding: '1rem 0',
+        zIndex: 10
+      }}>
         {electionName}
       </Header>
 
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-6 space-y-10 mt-6">
-        {/* Candidates */}
+      <div style={{ maxWidth: '5xl', margin: '0 auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <div>
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">🧑‍💼 Candidates</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>🧑‍💼 Candidates</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             {results.map((c, idx) => (
-              <div key={idx} className="p-4 bg-blue-100 rounded-xl shadow">
-                <p className="text-lg font-medium">{c.candidateName}</p>
-                <p className="text-sm text-gray-700">Category: {c.category}</p>
-                <p className="text-sm text-gray-700">Votes: {c.votes}</p>
+              <div key={idx} style={{ padding: '1rem', backgroundColor: '#DBEAFE', borderRadius: '1rem', boxShadow: theme.cardShadow }}>
+                <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem' }}>{c.candidateName}</p>
+                <p style={{ fontSize: '0.875rem', color: theme.textSecondary }}>Category: {c.category}</p>
+                <p style={{ fontSize: '0.875rem', color: theme.textSecondary }}>Votes: {c.votes}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Total Votes */}
         <div>
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">📈 Total Votes</h2>
-          <p className="text-lg font-medium">{totalVotes}</p>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '0.5rem' }}>📈 Total Votes</h2>
+          <p style={{ fontSize: '1rem', fontWeight: 600 }}>{totalVotes}</p>
         </div>
 
-        {/* Category Votes */}
         <div>
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">🏷️ Category Votes</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>🏷️ Category Votes</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             {categoryResults.map((c, idx) => (
-              <div key={idx} className="p-4 bg-green-100 rounded-xl shadow">
-                <p className="text-lg font-medium">{c.name}</p>
-                <p className="text-sm text-gray-700">Votes: {c.votes}</p>
+              <div key={idx} style={{ padding: '1rem', backgroundColor: '#DCFCE7', borderRadius: '1rem', boxShadow: theme.cardShadow }}>
+                <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.25rem' }}>{c.name}</p>
+                <p style={{ fontSize: '0.875rem', color: theme.textSecondary }}>Votes: {c.votes}</p>
               </div>
             ))}
           </div>
@@ -126,5 +136,3 @@ function ElectionResultPage() {
     </div>
   );
 }
-
-export default ElectionResultPage;
