@@ -38,7 +38,7 @@ export default function ElectionForm() {
   };
 
   useEffect(() => {
-    fetch("http://localhost:5000/utils/get-all-configs", {
+    fetch("https://voting-api-wnlq.onrender.com/utils/get-all-configs", {
       headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
     })
       .then(res => res.json())
@@ -132,7 +132,7 @@ export default function ElectionForm() {
       configId = originalPreset.id;
     } else {
       if (!configName.trim()) return alert('Provide a config name.');
-      const res = await fetch('http://localhost:5000/config/create-config', {
+      const res = await fetch('https://voting-api-wnlq.onrender.com/config/create-config', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + localStorage.getItem("evm.token"), 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: configName, pins: pinBits, grouppins: sparseGroups, groupNames: groupMap })
@@ -141,7 +141,7 @@ export default function ElectionForm() {
       configId = data.config_id;
     }
 
-    await fetch('http://localhost:5000/election/create-election', {
+    await fetch('https://voting-api-wnlq.onrender.com/election/create-election', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + localStorage.getItem("evm.token"), 'Content-Type': 'application/json' },
       body: JSON.stringify({ electionName, candidates: JSON.stringify(names), configId })

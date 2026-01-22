@@ -7,7 +7,7 @@ export default function ConfigListPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/utils/get-all-configs', {
+    fetch('https://voting-api-wnlq.onrender.com/utils/get-all-configs', {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('evm.token')
       }

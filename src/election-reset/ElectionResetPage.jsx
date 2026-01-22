@@ -28,7 +28,7 @@ export default function ElectionResetPage() {
 
     const fetchVoteStatus = async () => {
         try {
-            const res = await fetch(`http://localhost:5000/startup/vote-status?espId=NVEM1234`, {
+            const res = await fetch(`https://voting-api-wnlq.onrender.com/startup/vote-status?espId=NVEM1234`, {
                 headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
             })
             if (!res.ok) return
@@ -40,7 +40,7 @@ export default function ElectionResetPage() {
     }
 
     useEffect(() => {
-        const socket = io("http://localhost:5000/", {
+        const socket = io("https://voting-api-wnlq.onrender.com/", {
             query: { token: "Bearer " + localStorage.getItem("evm.token") }
         })
         socketRef.current = socket
@@ -48,13 +48,13 @@ export default function ElectionResetPage() {
         socket.on("connect", async () => {
             socket.emit("post-connection", { espId: "NVEM1234", role: "web" })
             try {
-                const res = await fetch(`http://localhost:5000/utils/get-all-elections/?election_id=${electionId}`, {
+                const res = await fetch(`https://voting-api-wnlq.onrender.com/utils/get-all-elections/?election_id=${electionId}`, {
                     headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
                 })
                 const data = await res.json()
                 const isCurr = data?.election_config?.isCurrent
                 if (!isCurr && flag === "0") {
-                    const startRes = await fetch("http://localhost:5000/election/start-election", {
+                    const startRes = await fetch("https://voting-api-wnlq.onrender.com/election/start-election", {
                         method: "POST",
                         headers: {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
@@ -64,7 +64,7 @@ export default function ElectionResetPage() {
                     })
                     if (startRes.status === 200) navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 } else if (isCurr && flag === "1") {
-                    const resumeRes = await fetch("http://localhost:5000/election/resume-election", {
+                    const resumeRes = await fetch("https://voting-api-wnlq.onrender.com/election/resume-election", {
                         method: "POST",
                         headers: {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
@@ -95,7 +95,7 @@ export default function ElectionResetPage() {
 
     const handleEndElection = async () => {
         try {
-            const res = await fetch(`http://localhost:5000/election/end-election`, {
+            const res = await fetch(`https://voting-api-wnlq.onrender.com/election/end-election`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -25,7 +25,7 @@ export default function ElectionResultPage() {
   useEffect(() => {
     async function fetchResults() {
       try {
-        const response = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
+        const response = await fetch(`https://voting-api-wnlq.onrender.com/utils/get-vote-count/${electionId}`, {
           headers: { "Authorization": "Bearer " + localStorage.getItem("evm.token") }
         });
         if (!response.ok) throw new Error("Failed to fetch vote data");

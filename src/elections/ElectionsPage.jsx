@@ -12,7 +12,7 @@ export default function ElectionsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("evm.token");
-    fetch("http://localhost:5000/utils/get-all-elections", {
+    fetch("https://voting-api-wnlq.onrender.com/utils/get-all-elections", {
       headers: { Authorization: "Bearer " + token }
     })
       .then(async res => {

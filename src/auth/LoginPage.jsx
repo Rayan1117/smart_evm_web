@@ -17,7 +17,7 @@ function LoginPage() {
     const username = formData.get("username")
     const password = formData.get("password")
 
-    const response = await fetch("http://localhost:5000/auth/login", {
+    const response = await fetch("https://voting-api-wnlq.onrender.com/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
       headers: { "Content-Type": "application/json" }

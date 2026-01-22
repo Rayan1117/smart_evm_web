@@ -65,7 +65,7 @@ export default function CreateConfigPage() {
 
     console.log("Submitting config to DB", pinBits, sparseGroupPins);
 
-    fetch("http://localhost:5000/config/create-config", {
+    fetch("https://voting-api-wnlq.onrender.com/config/create-config", {
         method: "POST",
         headers: {
             "Authorization": "Bearer " + localStorage.getItem("evm.token"),

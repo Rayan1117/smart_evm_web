@@ -26,7 +26,7 @@ export default function ElectionLiveStatsPage() {
   };
 
   useEffect(() => {
-    const socket = io("http://localhost:5000/live-election", {
+    const socket = io("https://voting-api-wnlq.onrender.com/live-election", {
       transports: ["websocket"],
       query: { token: "Bearer " + localStorage.getItem("evm.token") }
     });
@@ -69,7 +69,7 @@ export default function ElectionLiveStatsPage() {
     });
 
     const fetchVoteData = async () => {
-      const res = await fetch(`http://localhost:5000/utils/get-vote-count/${electionId}`, {
+      const res = await fetch(`https://voting-api-wnlq.onrender.com/utils/get-vote-count/${electionId}`, {
         headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
       });
       const data = await res.json();

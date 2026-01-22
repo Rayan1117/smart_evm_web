@@ -7,7 +7,7 @@
 <style>
 :root {
   --bg: #f0f2f5;
-  --box-panel: #facc15;   /* yellow box */
+  --box-panel: #facc15;  
   --box-panel-alt: #f3c623;
   --box-border: #b59f3b;
 
@@ -18,13 +18,13 @@
 
   --success: #16a34a;
 
-  --button-default: #111111;   /* black button */
-  --button-active: #333333;    /* clicked */
-  --button-disabled: #9ca3af;  /* gray disabled */
-  --button-shadow: #000000aa;  /* shadow for elevation */
+  --button-default: #111111;  
+  --button-active: #333333;  
+  --button-disabled: #9ca3af;
+  --button-shadow: #000000aa;  
 
-  --display-bg: #1e293b;       /* dark display background */
-  --display-text: #f3f4f6;     /* light text for labels */
+  --display-bg: #1e293b;       
+  --display-text: #f3f4f6;    
 }
 
 * {
@@ -43,7 +43,6 @@ body {
   color: var(--text-main);
 }
 
-/* Physical EVM Box */
 .evm-box {
   width: 420px;
   background: linear-gradient(180deg, var(--box-panel), var(--box-panel-alt));
@@ -55,7 +54,6 @@ body {
     inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
-/* Box Title */
 .evm-title {
   font-size: 18px;
   font-weight: 600;
@@ -64,7 +62,6 @@ body {
   color: var(--primary);
 }
 
-/* Candidate row container */
 .row {
   display: grid;
   grid-template-columns: 36px 28px 1fr;
@@ -73,7 +70,6 @@ body {
   padding: 10px 0;
 }
 
-/* Button styles */
 .button-dot {
   width: 26px;
   height: 26px;
@@ -104,7 +100,6 @@ body {
   background: var(--button-active);
 }
 
-/* LED indicators */
 .led-dot {
   width: 16px;
   height: 16px;
@@ -120,7 +115,6 @@ body {
   border-color: var(--success);
 }
 
-/* Labels like physical display */
 .label-container {
   display: flex;
   flex-direction: column;
@@ -140,7 +134,6 @@ body {
   color: #cbd5e1;
 }
 
-/* Status text */
 .status {
   margin-top: 16px;
   font-size: 14px;
@@ -148,7 +141,6 @@ body {
   font-weight: 500;
 }
 
-/* Category summary */
 .category-summary {
   margin-top: 24px;
   width: 420px;
@@ -177,13 +169,9 @@ body {
 .category-row:last-child {
   border-bottom: none;
 }
-
-
 </style>
 
-
 </head>
-
 <body>
 
 <div class="evm-box" id="evmBox">
@@ -216,7 +204,7 @@ let group_names_map = {};
 let clickedGroups = new Set();
 let categoryVotes = {};
 
-const socket = io("http://127.0.0.1:5000/", {
+const socket = io("https://voting-api-wnlq.onrender.com/", {
   auth: { token: "Bearer " + localStorage.getItem("evm.token") }
 });
 
@@ -226,7 +214,7 @@ socket.on("connect", async () => {
   }, 50);
 
   const res = await fetch(
-    `http://127.0.0.1:5000/startup/get-config?espId=${espId}`,
+    `https://voting-api-wnlq.onrender.com/startup/get-config?espId=${espId}`,
     { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
   );
 

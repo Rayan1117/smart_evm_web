@@ -11,7 +11,7 @@ const isAuthenticated = () => {
     }
 
 
-    return fetch("http://localhost:5000/verification/verify-token",
+    return fetch("https://voting-api-wnlq.onrender.com/verification/verify-token",
         {
             method: "POST",
             body: JSON.stringify({
