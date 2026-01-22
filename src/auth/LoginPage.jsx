@@ -2,12 +2,26 @@ import { useNavigate } from 'react-router-dom'
 import { useContext, useState } from 'react'
 import { UserContext } from '../App'
 
-function LoginPage() {
+const theme = {
+  header: '#1C74E9',
+  headerText: '#FFFFFF',
+  cardBg: '#FFFFFF',
+  ongoingCardBg: '#EFF6FF',
+  bg: '#F5F5F5',
+  textPrimary: '#111827',
+  textSecondary: '#4B5563',
+  buttonPrimary: '#1C74E9',
+  buttonText: '#FFFFFF',
+  bannerGradient: 'linear-gradient(145deg, #EFF6FF, #DBEAFE)',
+  bannerBorder: '#1C74E9',
+  cardShadow: '0 4px 12px rgba(0,0,0,0.08)',
+  fontFamily: "'Inter', sans-serif",
+}
+
+export default function LoginPage() {
   const userProvider = useContext(UserContext)
   const navigate = useNavigate()
   const [error, setError] = useState("")
-  
-  console.log(userProvider.role);
 
   const loginHandler = async (e) => {
     e.preventDefault()
@@ -27,8 +41,6 @@ function LoginPage() {
 
     if (response.ok) {
       localStorage.setItem("evm.token", data.token)
-      console.log(data.role);
-      
       userProvider.setRole("admin")
       navigate("/")
     } else if (response.status === 400) {
@@ -38,50 +50,94 @@ function LoginPage() {
     }
   }
 
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.bg,
+      padding: '1rem',
+      fontFamily: theme.fontFamily,
+    },
+    card: {
+      maxWidth: '400px',
+      width: '100%',
+      backgroundColor: theme.cardBg,
+      padding: '2rem',
+      borderRadius: '1rem',
+      boxShadow: theme.cardShadow,
+    },
+    title: {
+      textAlign: 'center',
+      fontSize: '1.875rem',
+      fontWeight: '700',
+      color: theme.header,
+      marginBottom: '1.5rem',
+    },
+    error: {
+      backgroundColor: '#fee2e2',
+      color: '#b91c1c',
+      fontSize: '0.875rem',
+      padding: '0.5rem 0.75rem',
+      borderRadius: '0.25rem',
+      marginBottom: '1rem',
+    },
+    form: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1rem',
+    },
+    inputGroup: {
+      display: 'flex',
+      flexDirection: 'column',
+    },
+    label: {
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      color: theme.textSecondary,
+      marginBottom: '0.25rem',
+    },
+    input: {
+      padding: '0.5rem 1rem',
+      border: '1px solid #D1D5DB',
+      borderRadius: '0.5rem',
+      outline: 'none',
+      fontSize: '1rem',
+    },
+    button: {
+      padding: '0.5rem',
+      backgroundColor: theme.buttonPrimary,
+      color: theme.buttonText,
+      fontWeight: '600',
+      border: 'none',
+      borderRadius: '0.5rem',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease-in-out',
+    },
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-softGray px-4">
-      <div className="max-w-md w-full bg-white shadow-xl rounded-2xl p-8">
-        <h1 className="text-3xl font-bold text-evmBlue text-center mb-6">SMART EVM LOGIN</h1>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>SMART EVM LOGIN</h1>
 
-        {error && (
-          <div className="bg-red-100 text-red-700 text-sm rounded px-3 py-2 mb-4">
-            {error}
-          </div>
-        )}
+        {error && <div style={styles.error}>{error}</div>}
 
-        <form onSubmit={loginHandler} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-textGray mb-1">EVM ID</label>
-            <input
-              type="text"
-              name="username"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-evmBlue"
-              placeholder="Enter your EVM ID"
-              required
-            />
+        <form onSubmit={loginHandler} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>EVM ID</label>
+            <input type="text" name="username" style={styles.input} placeholder="Enter your EVM ID" required />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-textGray mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-evmBlue"
-              placeholder="Enter password"
-              required
-            />
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Password</label>
+            <input type="password" name="password" style={styles.input} placeholder="Enter password" required />
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-evmBlue hover:bg-evmYellow text-white font-semibold py-2 rounded-lg transition-colors"
-          >
-            Login
-          </button>
+          <button type="submit" style={styles.button}>Login</button>
         </form>
       </div>
     </div>
   )
 }
-
-export default LoginPage
