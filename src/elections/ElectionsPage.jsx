@@ -140,6 +140,12 @@ export default function ElectionsPage() {
                   ongoingElectionId={ongoingElection?.election_id || null}
                   openModal={openModal}
                   theme={theme}
+                  onDeleted={(deletedId) => {
+                    setElections((prev) => prev.filter(e => e.election_id !== deletedId));
+                    if (ongoingElection?.election_id === deletedId) {
+                      setOngoingElection(null);
+                    }
+                  }}
                 />
               </div>
             )}

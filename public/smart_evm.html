@@ -239,7 +239,14 @@
       updateStatus();
     });
 
-    socket.on("change-config", data => { currentPins = data.pin_bits; buildUI(); socket.emit("config-changed", data.group_pins); });
+    socket.on("change-config", data => {
+      currentPins = data.pin_bits;
+      group_pins = data.group_pins;
+      group_names_map = data.group_names?? group_names_map;
+      candidateNames = data.candidate_names?? candidateNames;
+      buildUI();
+      socket.emit("config-changed", data.group_pins);
+    });
 
     socket.on("reconnect", () => {
       socket.emit("post-connection", { espId, role: "esp" });

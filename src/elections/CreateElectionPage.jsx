@@ -1,4 +1,4 @@
-import { Modal, Input, Button } from 'antd';
+import { Modal, Input, Button, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfigPresetModal from './components/ConfigPresetModal';
@@ -9,8 +9,8 @@ export default function ElectionForm() {
   const [tab, setTab] = useState('manual');
   const [electionName, setElectionName] = useState('');
   const [candidates, setCandidates] = useState([
-    { name: '', groupId: 1 },
-    { name: '', groupId: 1 },
+    { name: '', categoryId: 1 },
+    { name: '', categoryId: 1 },
   ]);
 
   const [pinBits, setPinBits] = useState([1, 1, 0, 0, 0, 0, 0, 0]);
@@ -19,51 +19,73 @@ export default function ElectionForm() {
   const [configLocked, setConfigLocked] = useState(false);
   const [originalPreset, setOriginalPreset] = useState(null);
 
-  const [groupMap, setGroupMap] = useState({});
-  const [showGroupModal, setShowGroupModal] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
+  const [categoryMap, setCategoryMap] = useState({});
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   useEffect(() => {
-    fetch("https://voting-api-wnlq.onrender.com/utils/get-all-configs", {
-      headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
-    })
-      .then(res => res.json())
-      .then(data => {
+    const fetchConfigs = async () => {
+      try {
+        const res = await fetch("https://voting-api-wnlq.onrender.com/utils/get-all-configs", {
+          headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
+        });
+
+        if (!res.ok) throw new Error(`Failed to load configs (${res.status})`);
+
+        const data = await res.json();
+        if (!data || !Array.isArray(data.configs)) {
+          setPresetConfigs([]);
+          return;
+        }
+
         const parsed = data.configs.map(cfg => ({
           id: cfg.config_id,
           name: cfg.config_name,
-          pinBits: JSON.parse(cfg.pin_bits),
-          groupPins: JSON.parse(cfg.group_pins),
-          groupNames: cfg.group_names ? JSON.parse(cfg.group_names) : {}
+          pinBits: JSON.parse(cfg.pin_bits || '[]'),
+          categoryPins: JSON.parse(cfg.group_pins || '[]'),
+          categoryNames: cfg.group_names ? JSON.parse(cfg.group_names) : {}
         }));
+
         setPresetConfigs(parsed);
-      });
+      } catch (err) {
+        console.error("Error fetching configs:", err);
+        setPresetConfigs([]);
+      }
+    };
+
+    fetchConfigs();
   }, []);
 
   const activeButtons = pinBits.filter(b => b === 1).length;
-  const maxGroupsAllowed = Math.floor(activeButtons / 2);
-  const existingGroupIds = Object.keys(groupMap).map(Number);
+  const maxCategoriesAllowed = Math.floor(activeButtons / 2);
+  const existingCategoryIds = Object.keys(categoryMap).map(Number);
 
   const unlockPreset = () => {
     setConfigLocked(false);
     setOriginalPreset(null);
   };
 
-  const handleAddGroup = () => {
-    if (!newGroupName.trim()) return alert('Group name cannot be empty.');
-    if (existingGroupIds.length >= maxGroupsAllowed)
-      return alert(`Max ${maxGroupsAllowed} groups allowed.`);
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return message.warning('Category name cannot be empty.');
+    if (existingCategoryIds.length >= maxCategoriesAllowed)
+      return message.warning(`Max ${maxCategoriesAllowed} categories allowed.`);
 
-    const nextId = existingGroupIds.length ? Math.max(...existingGroupIds) + 1 : 1;
-    setGroupMap(prev => ({ ...prev, [nextId]: newGroupName.trim() }));
-    setNewGroupName('');
-    setShowGroupModal(false);
+    const nextId = existingCategoryIds.length ? Math.max(...existingCategoryIds) + 1 : 1;
+
+    setCategoryMap(prev => ({ ...prev, [nextId]: newCategoryName.trim() }));
+
+    // Assign the new category to any candidate that does not have one
+    setCandidates(prev =>
+      prev.map(c => ({ ...c, categoryId: c.categoryId || nextId }))
+    );
+
+    setNewCategoryName('');
+    setShowCategoryModal(false);
     unlockPreset();
   };
 
   const handleAddCandidate = () => {
     if (candidates.length >= 8) return;
-
     const idx = pinBits.indexOf(0);
     if (idx === -1) return;
 
@@ -71,7 +93,7 @@ export default function ElectionForm() {
     updatedPins[idx] = 1;
 
     setPinBits(updatedPins);
-    setCandidates([...candidates, { name: '', groupId: existingGroupIds[0] || 1 }]);
+    setCandidates([...candidates, { name: '', categoryId: existingCategoryIds[0] || 1 }]);
     unlockPreset();
   };
 
@@ -97,33 +119,34 @@ export default function ElectionForm() {
     setCandidates(updated);
   };
 
-  const updateCandidateGroup = (idx, groupId) => {
+  const updateCandidateCategory = (idx, categoryId) => {
     const updated = [...candidates];
-    updated[idx].groupId = groupId;
+    updated[idx].categoryId = categoryId;
     setCandidates(updated);
     unlockPreset();
   };
 
-const loadPreset = preset => {
-  const newCandidates = [];
-  preset.pinBits.forEach((bit, pinIndex) => {
-    if (bit === 1) {
-      newCandidates.push({
-        name: '',
-        groupId: preset.groupPins?.[pinIndex] ?? 1
-      });
-    }
-  });
+  const loadPreset = preset => {
+    if (!preset) return;
+    const newCandidates = [];
 
-  setCandidates(newCandidates);
-  setPinBits(preset.pinBits);
-  setGroupMap(preset.groupNames || {});
-  setConfigLocked(true);
-  setOriginalPreset(preset);
-  setConfigName('');
-  setTab('manual');
-};
+    preset.pinBits.forEach((bit, pinIndex) => {
+      if (bit === 1) {
+        newCandidates.push({
+          name: '',
+          categoryId: preset.categoryPins?.[pinIndex] ?? 1
+        });
+      }
+    });
 
+    setCandidates(newCandidates);
+    setPinBits(preset.pinBits);
+    setCategoryMap(preset.categoryNames || {});
+    setConfigLocked(true);
+    setOriginalPreset(preset);
+    setConfigName('');
+    setTab('manual');
+  };
 
   const isSameConfig = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -131,69 +154,74 @@ const loadPreset = preset => {
     e.preventDefault();
 
     const names = candidates.map(c => c.name.trim());
-    if (names.some(n => !n)) return alert('Candidate name missing');
-
+    if (names.some(n => !n)) return message.warning('Candidate name missing');
     if (activeButtons !== candidates.length)
-      return alert('Active buttons must match candidates.');
+      return message.warning('Active buttons must match candidates.');
 
-    const groupCount = {};
+    const categoryCount = {};
     candidates.forEach(c => {
-      groupCount[c.groupId] = (groupCount[c.groupId] || 0) + 1;
+      categoryCount[c.categoryId] = (categoryCount[c.categoryId] || 0) + 1;
     });
 
-    if (!Object.values(groupCount).every(v => v >= 2))
-      return alert('Each group must have at least 2 candidates.');
+    if (!Object.values(categoryCount).every(v => v >= 2))
+      return message.warning('Each category must have at least 2 candidates.');
 
-    const sparseGroups = Array(8).fill(null);
+    const sparseCategories = Array(8).fill(null);
     let ci = 0;
     pinBits.forEach((b, i) => {
-      if (b === 1) sparseGroups[i] = candidates[ci++].groupId;
+      if (b === 1) sparseCategories[i] = candidates[ci++].categoryId;
     });
 
     let configId;
 
-    if (
-      configLocked &&
-      originalPreset &&
-      isSameConfig(pinBits, originalPreset.pinBits) &&
-      isSameConfig(sparseGroups, originalPreset.groupPins)
-    ) {
-      configId = originalPreset.id;
-    } else {
-      if (!configName.trim()) return alert('Provide a config name.');
+    try {
+      if (
+        configLocked &&
+        originalPreset &&
+        isSameConfig(pinBits, originalPreset.pinBits) &&
+        isSameConfig(sparseCategories, originalPreset.categoryPins)
+      ) {
+        configId = originalPreset.id;
+      } else {
+        if (!configName.trim()) return message.warning('Provide a config name.');
 
-      const res = await fetch('https://voting-api-wnlq.onrender.com/config/create-config', {
+        const res = await fetch('https://voting-api-wnlq.onrender.com/config/create-config', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + localStorage.getItem("evm.token"),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: configName,
+            pins: pinBits,
+            grouppins: sparseCategories,
+            groupNames: categoryMap
+          })
+        });
+
+        const data = await res.json();
+        configId = data.config_id;
+      }
+
+      await fetch('https://voting-api-wnlq.onrender.com/election/create-election', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer ' + localStorage.getItem("evm.token"),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: configName,
-          pins: pinBits,
-          grouppins: sparseGroups,
-          groupNames: groupMap
+          electionName,
+          candidates: JSON.stringify(names),
+          configId
         })
       });
 
-      const data = await res.json();
-      configId = data.config_id;
+      message.success('Election created successfully!');
+      navigator('/');
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to create election');
     }
-
-    await fetch('https://voting-api-wnlq.onrender.com/election/create-election', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + localStorage.getItem("evm.token"),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        electionName,
-        candidates: JSON.stringify(names),
-        configId
-      })
-    });
-
-    navigator('/');
   };
 
   return (
@@ -223,22 +251,29 @@ const loadPreset = preset => {
         {candidates.map((c, i) => (
           <div key={i} className="flex gap-2">
             <Input placeholder={`Candidate ${i + 1}`} value={c.name} onChange={e => updateCandidateName(i, e.target.value)} />
-            <select
-              value={c.groupId}
-              onChange={e =>
-                e.target.value === 'add'
-                  ? setShowGroupModal(true)
-                  : updateCandidateGroup(i, Number(e.target.value))
-              }
-              className="border p-2 rounded"
-            >
-              {Object.entries(groupMap).map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
-              ))}
-              {existingGroupIds.length < maxGroupsAllowed && (
-                <option value="add">+ Add new group</option>
-              )}
-            </select>
+
+            {existingCategoryIds.length === 0 ? (
+              <Button type="button" onClick={() => setShowCategoryModal(true)}>+ Add Category</Button>
+            ) : (
+              <select
+                value={c.categoryId || ''}
+                onChange={e => {
+                  if (e.target.value === 'add') {
+                    setShowCategoryModal(true);
+                  } else {
+                    updateCandidateCategory(i, Number(e.target.value));
+                  }
+                }}
+                className="border p-2 rounded"
+              >
+                {Object.entries(categoryMap || {}).map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+                {existingCategoryIds.length < maxCategoriesAllowed && (
+                  <option value="add">+ Add new category</option>
+                )}
+              </select>
+            )}
           </div>
         ))}
 
@@ -270,9 +305,14 @@ const loadPreset = preset => {
         </button>
       </form>
 
-      <Modal title="Add New Group" open={showGroupModal} onOk={handleAddGroup} onCancel={() => setShowGroupModal(false)}>
-        <Input placeholder="Group name" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
-        <p className="text-sm text-gray-500 mt-2">Max groups allowed: {maxGroupsAllowed}</p>
+      <Modal
+        title="Add New Category"
+        open={showCategoryModal}
+        onOk={handleAddCategory}
+        onCancel={() => setShowCategoryModal(false)}
+      >
+        <Input placeholder="Category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
+        <p className="text-sm text-gray-500 mt-2">Max categories allowed: {maxCategoriesAllowed}</p>
       </Modal>
     </div>
   );
