@@ -213,10 +213,22 @@ socket.on("connect", async () => {
     socket.emit("post-connection", { espId, role: "esp" });
   }, 50);
 
-  const res = await fetch(
-    `https://voting-api-wnlq.onrender.com/startup/get-config?espId=${espId}`,
-    { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
-  );
+  let res;
+  try {
+    res = await fetch(
+      `https://voting-api-wnlq.onrender.com/startup/get-config?espId=${espId}`,
+      { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
+    );
+  } catch {
+    showNoElection("Unable to connect to server");
+    return;
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    showNoElection("No ongoing election for this EVM");
+    return;
+  }
 
   const {
     pin_bits,
@@ -308,6 +320,27 @@ function buildUI() {
     row.append(btn, led, label);
     evmBox.appendChild(row);
   }
+}
+
+function showNoElection(message) {
+  evmBox.innerHTML = `
+    <div class="evm-title">Electronic Voting Machine</div>
+    <div style="
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 12px;
+      background: #1e293b;
+      color: #e5e7eb;
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.6;
+    ">
+      ${message}
+    </div>
+  `;
+
+  categorySummary.style.display = "none";
+  statusText.textContent = "Idle";
 }
 
 function recoverCachedVotes(cached = []) {
