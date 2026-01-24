@@ -14,7 +14,6 @@ export default function ElectionForm() {
   ]);
   const [submitting, setSubmitting] = useState(false);
 
-
   const [pinBits, setPinBits] = useState([1, 1, 0, 0, 0, 0, 0, 0]);
   const [presetConfigs, setPresetConfigs] = useState([]);
   const [configName, setConfigName] = useState('');
@@ -28,8 +27,8 @@ export default function ElectionForm() {
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(null);
 
   useEffect(() => {
-    fetch("https://voting-api-wnlq.onrender.com/utils/get-all-configs", {
-      headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") }
+    fetch('https://voting-api-wnlq.onrender.com/utils/get-all-configs', {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('evm.token') }
     })
       .then(res => res.json())
       .then(data => {
@@ -51,13 +50,8 @@ export default function ElectionForm() {
 
   const loadPreset = preset => {
     const newCandidates = [];
-    preset.pinBits.forEach((bit, i) => {
-      if (bit === 1) {
-        newCandidates.push({
-          name: '',
-          categoryId: preset.categoryPins?.[i] ?? null
-        });
-      }
+    preset.pinBits.forEach(bit => {
+      if (bit === 1) newCandidates.push({ name: '', categoryId: null });
     });
 
     setCandidates(newCandidates);
@@ -67,6 +61,56 @@ export default function ElectionForm() {
     setTab('manual');
   };
 
+  const togglePin = index => {
+    const updated = [...pinBits];
+    updated[index] = updated[index] ? 0 : 1;
+
+    const enabled = updated.filter(b => b === 1).length;
+    if (enabled < 2 || enabled > 8) return;
+
+    setPinBits(updated);
+
+    setCandidates(prev => {
+      const copy = [...prev];
+      while (copy.length < enabled) copy.push({ name: '', categoryId: null });
+      return copy.slice(0, enabled);
+    });
+  };
+
+  const addCandidate = () => {
+    if (candidates.length >= 8) return message.warning('Maximum 8 candidates');
+
+    const idx = pinBits.findIndex(b => b === 0);
+    if (idx === -1) return;
+
+    const updatedPins = [...pinBits];
+    updatedPins[idx] = 1;
+
+    setPinBits(updatedPins);
+    setCandidates(prev => [...prev, { name: '', categoryId: null }]);
+  };
+
+  const removeCandidate = index => {
+    if (candidates.length <= 2) {
+      return message.warning('Minimum 2 candidates required');
+    }
+
+    const updatedPins = [...pinBits];
+    let seen = -1;
+    for (let i = 0; i < updatedPins.length; i++) {
+      if (updatedPins[i] === 1) {
+        seen++;
+        if (seen === index) {
+          updatedPins[i] = 0;
+          break;
+        }
+      }
+    }
+
+    setPinBits(updatedPins);
+    setCandidates(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) {
       setFormError('Category name cannot be empty');
@@ -74,7 +118,6 @@ export default function ElectionForm() {
     }
 
     if (existingCategoryIds.length >= maxCategoriesAllowed) {
-      setFormError(`Maximum ${maxCategoriesAllowed} categories allowed`);
       return message.warning(`Max ${maxCategoriesAllowed} categories allowed`);
     }
 
@@ -86,24 +129,19 @@ export default function ElectionForm() {
 
     if (activeCandidateIndex !== null) {
       setCandidates(prev => {
-        const updated = [...prev];
-        updated[activeCandidateIndex] = {
-          ...updated[activeCandidateIndex],
-          categoryId: nextId
-        };
-        return updated;
+        const copy = [...prev];
+        copy[activeCandidateIndex].categoryId = nextId;
+        return copy;
       });
     }
 
     setNewCategoryName('');
     setShowCategoryModal(false);
     setActiveCandidateIndex(null);
-    setFormError('');
   };
 
-  const updateCategoryName = (id, name) => {
+  const updateCategoryName = (id, name) =>
     setCategoryMap(prev => ({ ...prev, [id]: name }));
-  };
 
   const deleteCategory = id => {
     setCategoryMap(prev => {
@@ -111,7 +149,6 @@ export default function ElectionForm() {
       delete copy[id];
       return copy;
     });
-
     setCandidates(prev =>
       prev.map(c => (c.categoryId === id ? { ...c, categoryId: null } : c))
     );
@@ -121,25 +158,21 @@ export default function ElectionForm() {
     e.preventDefault();
     setFormError('');
 
-    if (!electionName.trim()) {
-      setFormError('Election name is required');
-      return;
-    }
+    if (!electionName.trim()) return setFormError('Election name is required');
+    if (!configName.trim()) return setFormError('Config name is required');
+    if (candidates.some(c => !c.name.trim()))
+      return setFormError('All candidates must have a name');
+    if (candidates.some(c => !c.categoryId))
+      return setFormError('Each candidate must be assigned to a category');
 
-    if (!configName.trim()) {
-      setFormError('Config name is required');
-      return;
-    }
+    const categoryCount = {};
+    candidates.forEach(c => {
+      categoryCount[c.categoryId] = (categoryCount[c.categoryId] || 0) + 1;
+    });
 
-    if (candidates.some(c => !c.name.trim())) {
-      setFormError('All candidates must have a name');
-      return;
-    }
-
-    if (candidates.some(c => !c.categoryId)) {
-      setFormError('Each candidate must be assigned to a category');
-      return;
-    }
+    const invalidCategory = Object.values(categoryCount).some(count => count < 2);
+    if (invalidCategory)
+      return setFormError('Each category must have at least 2 candidates');
 
     setSubmitting(true);
 
@@ -155,7 +188,7 @@ export default function ElectionForm() {
         {
           method: 'POST',
           headers: {
-            Authorization: 'Bearer ' + localStorage.getItem("evm.token"),
+            Authorization: 'Bearer ' + localStorage.getItem('evm.token'),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -167,11 +200,7 @@ export default function ElectionForm() {
         }
       );
 
-      if (!configRes.ok) {
-        const err = await configRes.json();
-        throw new Error(err?.message || 'Config creation failed');
-      }
-
+      if (!configRes.ok) throw new Error('Config creation failed');
       const configData = await configRes.json();
 
       const electionRes = await fetch(
@@ -179,7 +208,7 @@ export default function ElectionForm() {
         {
           method: 'POST',
           headers: {
-            Authorization: 'Bearer ' + localStorage.getItem("evm.token"),
+            Authorization: 'Bearer ' + localStorage.getItem('evm.token'),
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -190,15 +219,12 @@ export default function ElectionForm() {
         }
       );
 
-      if (!electionRes.ok) {
-        const err = await electionRes.json();
-        throw new Error(err?.message || 'Election creation failed');
-      }
+      if (!electionRes.ok) throw new Error('Election creation failed');
 
       message.success('Election created successfully');
       navigator('/');
     } catch (err) {
-      setFormError(err.message || 'Failed to create election');
+      setFormError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -209,13 +235,7 @@ export default function ElectionForm() {
       <h1 className="text-2xl font-bold mb-6 text-center">Create Election</h1>
 
       {formError && (
-        <Alert
-          type="error"
-          showIcon
-          className="mb-4"
-          message="Cannot create election"
-          description={formError}
-        />
+        <Alert type="error" showIcon message="Cannot create election" description={formError} className="mb-4" />
       )}
 
       <Button onClick={() => setTab('preset')} className="mb-4">
@@ -239,20 +259,14 @@ export default function ElectionForm() {
               placeholder={`Candidate ${i + 1}`}
               value={c.name}
               onChange={e => {
-                const updated = [...candidates];
-                updated[i].name = e.target.value;
-                setCandidates(updated);
+                const copy = [...candidates];
+                copy[i].name = e.target.value;
+                setCandidates(copy);
               }}
             />
 
             {existingCategoryIds.length === 0 ? (
-              <Button
-                type="button"
-                onClick={() => {
-                  setActiveCandidateIndex(i);
-                  setShowCategoryModal(true);
-                }}
-              >
+              <Button onClick={() => { setActiveCandidateIndex(i); setShowCategoryModal(true); }}>
                 Add Category
               </Button>
             ) : (
@@ -264,9 +278,9 @@ export default function ElectionForm() {
                     setActiveCandidateIndex(i);
                     setShowCategoryModal(true);
                   } else {
-                    const updated = [...candidates];
-                    updated[i].categoryId = Number(e.target.value);
-                    setCandidates(updated);
+                    const copy = [...candidates];
+                    copy[i].categoryId = Number(e.target.value);
+                    setCandidates(copy);
                   }
                 }}
               >
@@ -279,34 +293,55 @@ export default function ElectionForm() {
                 )}
               </select>
             )}
+
+            <Button danger onClick={() => removeCandidate(i)}>−</Button>
           </div>
         ))}
 
+        <Button type="dashed" onClick={addCandidate} block>
+          + Add Candidate
+        </Button>
         {existingCategoryIds.length > 0 && (
           <Button type="link" onClick={() => setShowManageCategories(true)}>
             Manage categories
           </Button>
         )}
 
-        <Button
-          htmlType="submit"
-          type="primary"
-          block
-          loading={submitting}
-        >
+
+        <Button htmlType="submit" type="primary" block loading={submitting}>
           Create Election
         </Button>
-
       </form>
+
+      <div className="mt-8 text-center">
+        <h3 className="mb-3 font-semibold">Select Buttons</h3>
+        <div className="flex justify-center gap-3 flex-wrap">
+          {pinBits.map((bit, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => togglePin(i)}
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: '50%',
+                backgroundColor: bit ? '#22c55e' : '#ef4444',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 600
+              }}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <Modal
         title="Add Category"
         open={showCategoryModal}
         onOk={handleAddCategory}
-        onCancel={() => {
-          setShowCategoryModal(false);
-          setActiveCandidateIndex(null);
-        }}
+        onCancel={() => { setShowCategoryModal(false); setActiveCandidateIndex(null); }}
       >
         <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
       </Modal>
@@ -314,18 +349,13 @@ export default function ElectionForm() {
       <Modal
         title="Manage Categories"
         open={showManageCategories}
-        onCancel={() => setShowManageCategories(false)}
         footer={null}
+        onCancel={() => setShowManageCategories(false)}
       >
         {Object.entries(categoryMap).map(([id, name]) => (
           <div key={id} className="flex gap-2 mb-2">
-            <Input
-              value={name}
-              onChange={e => updateCategoryName(Number(id), e.target.value)}
-            />
-            <Button danger onClick={() => deleteCategory(Number(id))}>
-              Delete
-            </Button>
+            <Input value={name} onChange={e => updateCategoryName(Number(id), e.target.value)} />
+            <Button danger onClick={() => deleteCategory(Number(id))}>Delete</Button>
           </div>
         ))}
       </Modal>
