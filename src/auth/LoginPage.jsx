@@ -22,31 +22,45 @@ export default function LoginPage() {
   const userProvider = useContext(UserContext)
   const navigate = useNavigate()
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const loginHandler = async (e) => {
     e.preventDefault()
+    if (loading) return
+
     setError("")
+    setLoading(true)
 
-    const formData = new FormData(e.target)
-    const username = formData.get("username")
-    const password = formData.get("password")
+    try {
+      const formData = new FormData(e.target)
+      const username = formData.get("username")
+      const password = formData.get("password")
 
-    const response = await fetch("https://voting-api-wnlq.onrender.com/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-      headers: { "Content-Type": "application/json" }
-    })
+      const response = await fetch(
+        "https://voting-api-wnlq.onrender.com/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ username, password }),
+          headers: { "Content-Type": "application/json" }
+        }
+      )
 
-    const data = await response.json()
+      const data = await response.json()
 
-    if (response.ok) {
+      if (!response.ok) {
+        if (response.status === 400) {
+          throw new Error("Invalid credentials. Please try again.")
+        }
+        throw new Error(data?.message || "Server error. Please try again later.")
+      }
+
       localStorage.setItem("evm.token", data.token)
       userProvider.setRole("admin")
       navigate("/")
-    } else if (response.status === 400) {
-      setError("Invalid credentials. Please try again.")
-    } else {
-      setError("Server error. Please try again later.")
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -107,12 +121,13 @@ export default function LoginPage() {
     },
     button: {
       padding: '0.5rem',
-      backgroundColor: theme.buttonPrimary,
+      backgroundColor: loading ? '#93C5FD' : theme.buttonPrimary,
       color: theme.buttonText,
       fontWeight: '600',
       border: 'none',
       borderRadius: '0.5rem',
-      cursor: 'pointer',
+      cursor: loading ? 'not-allowed' : 'pointer',
+      opacity: loading ? 0.8 : 1,
       transition: 'all 0.2s ease-in-out',
     },
   }
@@ -127,15 +142,31 @@ export default function LoginPage() {
         <form onSubmit={loginHandler} style={styles.form}>
           <div style={styles.inputGroup}>
             <label style={styles.label}>EVM ID</label>
-            <input type="text" name="username" style={styles.input} placeholder="Enter your EVM ID" required />
+            <input
+              type="text"
+              name="username"
+              style={styles.input}
+              placeholder="Enter your EVM ID"
+              required
+              disabled={loading}
+            />
           </div>
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>Password</label>
-            <input type="password" name="password" style={styles.input} placeholder="Enter password" required />
+            <input
+              type="password"
+              name="password"
+              style={styles.input}
+              placeholder="Enter password"
+              required
+              disabled={loading}
+            />
           </div>
 
-          <button type="submit" style={styles.button}>Login</button>
+          <button type="submit" style={styles.button} disabled={loading}>
+            {loading ? 'Logging in…' : 'Login'}
+          </button>
         </form>
       </div>
     </div>

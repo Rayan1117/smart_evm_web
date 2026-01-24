@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8">
   <title>EVM Simulator</title>
-
   <style>
     :root {
       --bg: #f0f2f5;
@@ -50,9 +49,7 @@
       border: 2px solid var(--box-border);
       border-radius: 18px;
       padding: 26px 24px;
-      box-shadow:
-        0 12px 28px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
 
     .evm-title {
@@ -95,10 +92,6 @@
       background: var(--button-disabled);
       cursor: not-allowed;
       box-shadow: none;
-    }
-
-    .button-dot.clicked {
-      background: var(--button-active);
     }
 
     .led-dot {
@@ -171,7 +164,6 @@
       border-bottom: none;
     }
   </style>
-
 </head>
 
 <body>
@@ -197,121 +189,83 @@
     const categorySummary = document.getElementById("categorySummary");
     const categoryList = document.getElementById("categoryList");
 
-    let leds = [];
-    let buttons = [];
-    let currentPins = [];
-    let group_pins = [];
-    let candidateNames = [];
-    let group_names_map = {};
-    let clickedGroups = new Set();
-    let categoryVotes = {};
+    let leds = [], buttons = [], currentPins = [], group_pins = [], candidateNames = [], group_names_map = {};
+    let clickedGroups = new Set(), categoryVotes = {};
 
     const socket = io("https://voting-api-wnlq.onrender.com/", {
       auth: { token: "Bearer " + localStorage.getItem("evm.token") }
     });
 
     socket.on("connect", async () => {
-      setTimeout(() => {
-        socket.emit("post-connection", { espId, role: "esp" });
-      }, 50);
+      setTimeout(() => socket.emit("post-connection", { espId, role: "esp" }), 50);
 
-      const res = await fetch(
-        `https://voting-api-wnlq.onrender.com/startup/get-config?espId=${espId}`,
-        { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
-      );
+      try {
+        const res = await fetch(
+          `https://voting-api-wnlq.onrender.com/startup/get-config?espId=${espId}`,
+          { headers: { Authorization: "Bearer " + localStorage.getItem("evm.token") } }
+        );
 
-      const {
-        pin_bits,
-        group_pins: gp,
-        cached_votes,
-        candidate_names,
-        group_names
-      } = await res.json();
+        if (!res.ok) {
+          const err = await res.json();
+          statusText.textContent = `No ongoing election: ${err.error}`;
+          return;
+        }
 
-      currentPins = JSON.parse(pin_bits);
-      group_pins = JSON.parse(gp);
-      candidateNames = JSON.parse(candidate_names || "[]");
-      group_names_map = JSON.parse(group_names || "{}");
+        const { pin_bits, group_pins: gp, cached_votes, candidate_names, group_names } = await res.json();
 
-      buildUI();
-      recoverCachedVotes(cached_votes);
-      updateCategoryVotes();
-      updateStatus();
+        currentPins = JSON.parse(pin_bits);
+        group_pins = JSON.parse(gp);
+        candidateNames = JSON.parse(candidate_names || "[]");
+        group_names_map = JSON.parse(group_names || "{}");
+
+        buildUI();
+        recoverCachedVotes(cached_votes);
+        updateCategoryVotes();
+        updateStatus();
+
+      } catch (e) {
+        console.error(e);
+        statusText.textContent = `Error fetching config`;
+      }
     });
+
 
     socket.on("change-config", data => {
       currentPins = data.pin_bits;
       group_pins = data.group_pins;
-      group_names_map = data.group_names?? group_names_map;
-      candidateNames = data.candidate_names?? candidateNames;
+      group_names_map = JSON.parse(data.group_names || "{}");
+      candidateNames = JSON.parse(data.candidate_names || "[]");
       buildUI();
       socket.emit("config-changed", data.group_pins);
     });
 
-    socket.on("reconnect", () => {
-      socket.emit("post-connection", { espId, role: "esp" });
-    });
-
-    socket.on("vote-updated", () => {
-      resetVote();
-    });
-
-    socket.on("check-presence", () => {
-      socket.emit("present", { room: espId, role: "esp" });
-    });
+    socket.on("reconnect", () => socket.emit("post-connection", { espId, role: "esp" }));
+    socket.on("vote-updated", resetVote);
+    socket.on("check-presence", () => socket.emit("present", { room: espId, role: "esp" }));
 
     function buildUI() {
       evmBox.innerHTML = `<div class="evm-title">Electronic Voting Machine</div>`;
-      leds = [];
-      buttons = [];
-      clickedGroups.clear();
-      categoryVotes = {};
-
+      leds = []; buttons = []; clickedGroups.clear(); categoryVotes = {};
       let nameIdx = 0;
 
       for (let i = 0; i < NUM_PINS; i++) {
-        const row = document.createElement("div");
-        row.className = "row";
+        const row = document.createElement("div"); row.className = "row";
+        const btn = document.createElement("div"); btn.className = "button-dot"; buttons.push(btn);
+        const led = document.createElement("div"); led.className = "led-dot"; leds.push(led);
+        const label = document.createElement("div"); label.className = "label-container";
 
-        const btn = document.createElement("div");
-        btn.className = "button-dot";
-        buttons.push(btn);
-
-        const led = document.createElement("div");
-        led.className = "led-dot";
-        leds.push(led);
-
-        const label = document.createElement("div");
-        label.className = "label-container";
-
-        const candidateText =
-          currentPins[i] === 1 ? candidateNames[nameIdx++] || "-" : "-";
-
+        const candidateText = currentPins[i] === 1 ? candidateNames[nameIdx++] || "-" : "-";
         const groupId = group_pins[i];
-        const categoryText =
-          groupId != null ? group_names_map[String(groupId)] : "-";
+        const categoryText = groupId != null ? group_names_map[groupId] : "-";
+        label.innerHTML = `<div class="candidate-name">${candidateText}</div><div class="category-name">${categoryText}</div>`;
 
-        label.innerHTML = `
-      <div class="candidate-name">${candidateText}</div>
-      <div class="category-name">${categoryText}</div>
-    `;
-
-        if (currentPins[i] === 0 || groupId == null) {
-          btn.classList.add("disabled");
-        } else {
+        if (currentPins[i] === 0 || groupId == null) btn.classList.add("disabled");
+        else {
           categoryVotes[groupId] ??= 0;
-
           btn.onclick = () => {
             if (clickedGroups.has(groupId)) return;
-
-            clickedGroups.add(groupId);
-            led.classList.add("on");
-            categoryVotes[groupId]++;
-            lockGroup(groupId);
-
-            updateCategoryVotes();
-            updateStatus();
-
+            clickedGroups.add(groupId); led.classList.add("on"); categoryVotes[groupId]++; lockGroup(groupId);
+            updateCategoryVotes(); updateStatus();
             socket.emit("vote-selected", { espId, voteIndex: i });
           };
         }
@@ -319,13 +273,13 @@
         row.append(btn, led, label);
         evmBox.appendChild(row);
       }
+      categorySummary.style.display = "block";
     }
 
     function recoverCachedVotes(cached = []) {
       cached.forEach(i => {
         const groupId = group_pins[i];
         if (groupId == null) return;
-
         clickedGroups.add(groupId);
         categoryVotes[groupId] = (categoryVotes[groupId] || 0) + 1;
         leds[i]?.classList.add("on");
@@ -334,38 +288,23 @@
     }
 
     function lockGroup(groupId) {
-      group_pins.forEach((g, i) => {
-        if (g === groupId) buttons[i]?.classList.add("locked");
-      });
+      group_pins.forEach((g, i) => { if (g === groupId) buttons[i]?.classList.add("locked"); });
     }
 
     function resetVote() {
       clickedGroups.clear();
-
-      Object.keys(categoryVotes).forEach(gid => {
-        categoryVotes[gid] = 0;
-      });
-
-      buttons.forEach((btn, i) => {
-        btn.classList.remove("locked");
-        leds[i]?.classList.remove("on");
-      });
-
+      Object.keys(categoryVotes).forEach(gid => categoryVotes[gid] = 0);
+      buttons.forEach(btn => btn.classList.remove("locked"));
+      leds.forEach(led => led.classList.remove("on"));
       updateCategoryVotes();
       updateStatus();
     }
 
     function updateCategoryVotes() {
       categoryList.innerHTML = "";
-      categorySummary.style.display = "block";
-
       Object.entries(categoryVotes).forEach(([gid, count]) => {
-        const row = document.createElement("div");
-        row.className = "category-row";
-        row.innerHTML = `
-      <span>${group_names_map[gid]}</span>
-      <strong>${count}</strong>
-    `;
+        const row = document.createElement("div"); row.className = "category-row";
+        row.innerHTML = `<span>${group_names_map[gid]}</span><strong>${count}</strong>`;
         categoryList.appendChild(row);
       });
     }
@@ -374,7 +313,6 @@
       statusText.textContent = `Categories voted: ${clickedGroups.size}`;
     }
   </script>
-
 </body>
 
 </html>

@@ -1,5 +1,4 @@
-import Modal from 'antd/es/modal/Modal'
-import React from 'react'
+import Modal from 'antd/es/modal/Modal';
 
 export default function ConfigPresetModal({ tab, presetConfigs, setTab, loadPreset }) {
   return (
@@ -8,63 +7,34 @@ export default function ConfigPresetModal({ tab, presetConfigs, setTab, loadPres
       onCancel={() => setTab('manual')}
       footer={null}
       centered
-      width={400}
+      width={420}
+      getContainer={() => document.body}
+      zIndex={2000}
+      maskStyle={{ zIndex: 1999 }}
     >
-      <div style={{ maxHeight: '70vh', overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Select a Preset</h2>
+      <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+        <h2 className="text-lg font-semibold">Select a Preset</h2>
 
         {presetConfigs.length === 0 ? (
-          <div style={{ color: '#6B7280' }}>No presets available.</div>
+          <div className="text-gray-500">No presets available.</div>
         ) : (
-          presetConfigs.map((preset) => (
+          presetConfigs.map(preset => (
             <div
               key={preset.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-              }}
+              className="border rounded p-3 flex justify-between items-start shadow"
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{preset.name || preset.id}</div>
-
-                <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
-                  <div>
-                    Pins:&nbsp;
-                    {preset.pinBits?.map((bit, i) => (
-                      <span key={i} style={{ marginRight: '0.25rem' }}>
-                        {bit === 1 ? '🟢' : '❌'}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div>
-                    Groups:&nbsp;
-                    {preset.groupPins?.map((groupId, i) => (
-                      <span key={i} style={{ marginRight: '0.25rem' }}>
-                        {groupId ? preset.groupNames?.[groupId] || `Group ${groupId}` : '❌'}
-                      </span>
-                    ))}
-                  </div>
+              <div className="space-y-1">
+                <div className="font-medium">{preset.name}</div>
+                <div className="text-xs text-gray-500">
+                  Pins: {preset.pinBits.map((b, i) => (
+                    <span key={i}>{b ? '🟢' : '❌'}</span>
+                  ))}
                 </div>
               </div>
 
               <button
-                style={{
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '0.375rem',
-                  background: 'linear-gradient(135deg, #3B82F6, #60A5FA)',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
                 onClick={() => loadPreset(preset)}
+                className="bg-blue-600 text-white px-3 py-1 rounded"
               >
                 Load
               </button>
@@ -73,5 +43,5 @@ export default function ConfigPresetModal({ tab, presetConfigs, setTab, loadPres
         )}
       </div>
     </Modal>
-  )
+  );
 }

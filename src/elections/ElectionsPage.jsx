@@ -44,7 +44,16 @@ export default function ElectionsPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: theme.bg, fontFamily: theme.fontFamily }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: theme.bg,
+        fontFamily: theme.fontFamily,
+        position: 'relative',
+        zIndex: 0,
+        userSelect: 'none',
+      }}
+    >
       <Header
         style={{
           background: theme.header,
@@ -58,6 +67,9 @@ export default function ElectionsPage() {
           boxShadow: theme.cardShadow,
           borderBottomLeftRadius: '0.75rem',
           borderBottomRightRadius: '0.75rem',
+          position: 'relative',
+          zIndex: 1,
+          userSelect: 'none',
         }}
       >
         Elections
@@ -76,6 +88,9 @@ export default function ElectionsPage() {
             cursor: 'pointer',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
             padding: '1.25rem 1.75rem',
+            position: 'relative',
+            zIndex: 1,
+            userSelect: 'none',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
@@ -93,6 +108,7 @@ export default function ElectionsPage() {
               textAlign: 'center',
               color: theme.textPrimary,
               margin: 0,
+              userSelect: 'none',
             }}
           >
             An election is currently ongoing. Click here to view details.
@@ -108,7 +124,16 @@ export default function ElectionsPage() {
         />
       )}
 
-      <div style={{ maxWidth: '80rem', margin: '2rem auto', padding: '0 1.5rem' }}>
+      <div
+        style={{
+          maxWidth: '80rem',
+          margin: '2rem auto',
+          padding: '0 1.5rem',
+          position: 'relative',
+          zIndex: 0,
+          userSelect: 'none',
+        }}
+      >
         {elections.length === 0 ? (
           <Empty description="No elections found in the database." />
         ) : (
@@ -124,6 +149,9 @@ export default function ElectionsPage() {
                     : theme.cardBg,
                   boxShadow: theme.cardShadow,
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  position: 'relative',
+                  zIndex: 0,
+                  userSelect: 'none',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-4px)';
@@ -167,6 +195,8 @@ export default function ElectionsPage() {
             fontWeight: 700,
             boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            zIndex: 2,
+            userSelect: 'none',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.05)';

@@ -1,4 +1,4 @@
-import { Button } from 'antd'
+import { Button, Alert } from 'antd'
 import { Header } from 'antd/es/layout/layout'
 import { HttpStatusCode } from 'axios'
 import React, { useEffect, useState, useRef } from 'react'
@@ -10,6 +10,9 @@ export default function ElectionResetPage() {
     const { flag } = useParams()
     const [buttonDisabled, setButtonDisabled] = useState(true)
     const [showConfirm, setShowConfirm] = useState(false)
+    const [resetLoading, setResetLoading] = useState(false)
+    const [endLoading, setEndLoading] = useState(false)
+    const [error, setError] = useState(null)
     const electionId = query.get("electionId")
     const socketRef = useRef()
     const navigate = useNavigate()
@@ -76,7 +79,9 @@ export default function ElectionResetPage() {
                 } else if (isCurr && flag === "0") {
                     navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 }
-            } catch {}
+            } catch (err) {
+                setError("Failed to initialize election connection")
+            }
         })
 
         socket.on("vote-selected", () => setButtonDisabled(false))
@@ -88,12 +93,16 @@ export default function ElectionResetPage() {
     }, [electionId, flag, navigate])
 
     const handleResetVote = () => {
+        setError(null)
+        setResetLoading(true)
         socketRef.current.emit("cast-vote", { espId: "NVEM1234", electionId })
         setButtonDisabled(true)
-        alert("Vote reset sent!")
+        setTimeout(() => setResetLoading(false), 500)
     }
 
     const handleEndElection = async () => {
+        setError(null)
+        setEndLoading(true)
         try {
             const res = await fetch(`https://voting-api-wnlq.onrender.com/election/end-election`, {
                 method: 'POST',
@@ -104,15 +113,15 @@ export default function ElectionResetPage() {
                 body: JSON.stringify({ electionId })
             })
             if (res.ok) {
-                alert("Election ended successfully!")
                 navigate("/")
             } else {
                 const err = await res.json()
-                alert("Failed to end election: " + JSON.stringify(err))
+                setError(err?.message || "Failed to end election")
             }
         } catch (err) {
-            alert("Error ending election: " + err.message)
+            setError(err.message || "Network error occurred")
         }
+        setEndLoading(false)
         setShowConfirm(false)
     }
 
@@ -122,8 +131,20 @@ export default function ElectionResetPage() {
                 Election Reset Page
             </Header>
 
-            <div style={{ marginTop: '6rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ marginTop: '6rem', width: '100%', maxWidth: '28rem' }}>
+                {error && (
+                    <Alert
+                        type="error"
+                        message={error}
+                        showIcon
+                        style={{ marginBottom: '1.5rem', borderRadius: '0.75rem' }}
+                    />
+                )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
                 <Button
+                    loading={resetLoading}
                     style={{
                         width: '16rem',
                         height: '3.5rem',
@@ -140,6 +161,7 @@ export default function ElectionResetPage() {
             </div>
 
             <Button
+                loading={endLoading}
                 style={{
                     position: 'fixed',
                     bottom: '2.5rem',
