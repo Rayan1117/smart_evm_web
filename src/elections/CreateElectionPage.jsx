@@ -32,13 +32,20 @@ export default function ElectionForm() {
     })
       .then(res => res.json())
       .then(data => {
-        const parsed = (data?.configs || []).map(cfg => ({
+        const rawConfigs =
+          data?.configs ||
+          data?.data ||
+          data ||
+          [];
+
+        const parsed = rawConfigs.map(cfg => ({
           id: cfg.config_id,
           name: cfg.config_name,
           pinBits: JSON.parse(cfg.pin_bits || '[]'),
           categoryPins: JSON.parse(cfg.group_pins || '[]'),
           categoryNames: cfg.group_names ? JSON.parse(cfg.group_names) : {}
         }));
+
         setPresetConfigs(parsed);
       })
       .catch(() => setPresetConfigs([]));
@@ -181,6 +188,13 @@ export default function ElectionForm() {
       let ci = 0;
       pinBits.forEach((b, i) => {
         if (b === 1) sparseCategories[i] = candidates[ci++].categoryId;
+      });
+
+      console.log({
+        name: configName,
+        pins: pinBits,
+        grouppins: sparseCategories,
+        groupNames: categoryMap
       });
 
       const configRes = await fetch(

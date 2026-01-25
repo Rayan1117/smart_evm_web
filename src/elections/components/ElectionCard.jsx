@@ -53,7 +53,9 @@ export default function ElectionCard({ election, ongoingElectionId, openModal, t
         const data = await res.json();
         setError(data?.error || 'Failed to delete election');
       }
-    } catch {
+    } catch(err) {
+      console.log(err.message);
+        
       setError('Network error occurred while deleting election');
     } finally {
       setIsDeleting(false);

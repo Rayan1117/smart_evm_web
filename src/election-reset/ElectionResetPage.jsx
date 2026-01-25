@@ -31,7 +31,7 @@ export default function ElectionResetPage() {
 
     const fetchVoteStatus = async () => {
         try {
-            const res = await fetch(`https://voting-api-wnlq.onrender.com/startup/vote-status?espId=NVEM1234`, {
+            const res = await fetch(`https://voting-api-wnlq.onrender.com/startup/vote-status?espId=${localStorage.getItem("evm.name")}`, {
                 headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
             })
             if (!res.ok) return
@@ -49,7 +49,7 @@ export default function ElectionResetPage() {
         socketRef.current = socket
 
         socket.on("connect", async () => {
-            socket.emit("post-connection", { espId: "NVEM1234", role: "web" })
+            socket.emit("post-connection", { espId: localStorage.getItem("evm.name"), role: "web" })
             try {
                 const res = await fetch(`https://voting-api-wnlq.onrender.com/utils/get-all-elections/?election_id=${electionId}`, {
                     headers: { authorization: "Bearer " + localStorage.getItem("evm.token") }
@@ -63,7 +63,7 @@ export default function ElectionResetPage() {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ electionId, espId: "NVEM1234" })
+                        body: JSON.stringify({ electionId, espId: localStorage.getItem("evm.name") })
                     })
                     if (startRes.status === 200) navigate(`/election-reset/1/?electionId=${electionId}`, { replace: true })
                 } else if (isCurr && flag === "1") {
@@ -73,7 +73,7 @@ export default function ElectionResetPage() {
                             authorization: "Bearer " + localStorage.getItem("evm.token"),
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ electionId, espId: "NVEM1234" })
+                        body: JSON.stringify({ electionId, espId: localStorage.getItem("evm.name") })
                     })
                     if (resumeRes.status === HttpStatusCode.Ok) await fetchVoteStatus()
                 } else if (isCurr && flag === "0") {
@@ -95,7 +95,7 @@ export default function ElectionResetPage() {
     const handleResetVote = () => {
         setError(null)
         setResetLoading(true)
-        socketRef.current.emit("cast-vote", { espId: "NVEM1234", electionId })
+        socketRef.current.emit("cast-vote", { espId: localStorage.getItem("evm.name"), electionId })
         setButtonDisabled(true)
         setTimeout(() => setResetLoading(false), 500)
     }

@@ -23,6 +23,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [loginType, setLoginType] = useState("user")
 
   const loginHandler = async (e) => {
     e.preventDefault()
@@ -40,7 +41,7 @@ export default function LoginPage() {
         "https://voting-api-wnlq.onrender.com/auth/login",
         {
           method: "POST",
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ username, password, role: loginType }),
           headers: { "Content-Type": "application/json" }
         }
       )
@@ -48,14 +49,15 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        if (response.status === 400) {
+        if (response.status === 401) {
           throw new Error("Invalid credentials. Please try again.")
         }
         throw new Error(data?.message || "Server error. Please try again later.")
       }
 
       localStorage.setItem("evm.token", data.token)
-      userProvider.setRole("admin")
+      localStorage.setItem("evm.name", username)
+      userProvider.setRole(loginType)
       navigate("/")
     } catch (err) {
       setError(err.message)
@@ -135,7 +137,9 @@ export default function LoginPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>SMART EVM LOGIN</h1>
+        <h1 style={styles.title}>
+          {loginType === "admin" ? "ADMIN LOGIN" : "USER LOGIN"}
+        </h1>
 
         {error && <div style={styles.error}>{error}</div>}
 
@@ -166,6 +170,24 @@ export default function LoginPage() {
 
           <button type="submit" style={styles.button} disabled={loading}>
             {loading ? 'Logging in…' : 'Login'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setLoginType(prev => (prev === "user" ? "admin" : "user"))
+            }
+            disabled={loading}
+            style={{
+              background: "none",
+              border: "none",
+              color: theme.header,
+              fontSize: "0.85rem",
+              cursor: loading ? 'not-allowed' : 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            {loginType === "user" ? "Admin login?" : "User login?"}
           </button>
         </form>
       </div>

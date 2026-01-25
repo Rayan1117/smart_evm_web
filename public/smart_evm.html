@@ -182,7 +182,7 @@
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     const NUM_PINS = 8;
-    const espId = "NVEM1234";
+    const espId = localStorage.getItem("evm.name");
 
     const evmBox = document.getElementById("evmBox");
     const statusText = document.getElementById("statusText");
