@@ -1,14 +1,19 @@
-import { Button, List, Empty } from 'antd';
+import { Button, List, Empty, Modal } from 'antd';
 import React, { useEffect, useState } from 'react';
 import ElectionCard from './components/ElectionCard';
 import { Header } from 'antd/es/layout/layout';
 import ElectionDetailsModal from './components/ElectionDetailsModal';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { LogoutOutlined } from '@ant-design/icons';
 
 export default function ElectionsPage() {
   const [elections, setElections] = useState([]);
   const [ongoingElection, setOngoingElection] = useState(null);
   const [modalData, setModalData] = useState({ isOpen: false, election: null });
+
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false); // ✅ added
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("evm.token");
@@ -26,6 +31,19 @@ export default function ElectionsPage() {
   }, []);
 
   const openModal = (election) => setModalData({ isOpen: true, election });
+
+  // ✅ open logout modal
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
+  // ✅ confirm logout
+  const confirmLogout = () => {
+    localStorage.removeItem("evm.token");
+    localStorage.removeItem("evm.role");
+    localStorage.removeItem("evm.username");
+    navigate("/login");
+  };
 
   const theme = {
     header: '#1C74E9',
@@ -73,7 +91,37 @@ export default function ElectionsPage() {
         }}
       >
         Elections
+
+        {/* ✅ Logout Icon Button */}
+        <Button
+          onClick={handleLogoutClick}
+          icon={<LogoutOutlined />}
+          style={{
+            position: 'absolute',
+            right: '2rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'transparent',
+            color: '#FFFFFF',
+            border: 'none',
+            fontSize: '1.3rem',
+            cursor: 'pointer'
+          }}
+        />
       </Header>
+
+      {/* ✅ Logout Modal */}
+      <Modal
+        title="Logout"
+        open={logoutModalOpen}
+        onOk={confirmLogout}
+        onCancel={() => setLogoutModalOpen(false)}
+        okText="Yes"
+        cancelText="No"
+        centered
+      >
+        <p>Do you want to logout?</p>
+      </Modal>
 
       {ongoingElection && (
         <div
@@ -181,7 +229,7 @@ export default function ElectionsPage() {
         )}
       </div>
 
-      <Link to="/create-election">
+      {localStorage.getItem("evm.role") === "admin" && <Link to="/create-election">
         <Button
           style={{
             position: 'fixed',
@@ -198,18 +246,10 @@ export default function ElectionsPage() {
             zIndex: 2,
             userSelect: 'none',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 10px 24px rgba(0,0,0,0.18)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
-          }}
         >
           +
         </Button>
-      </Link>
+      </Link>}
     </div>
   );
 }

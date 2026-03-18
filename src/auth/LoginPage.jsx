@@ -56,7 +56,8 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("evm.token", data.token)
-      localStorage.setItem("evm.name", username)
+      localStorage.setItem("evm.name", data.esp_id)
+      localStorage.setItem("evm.role", data.role)
       userProvider.setRole(loginType)
       navigate("/")
     } catch (err) {

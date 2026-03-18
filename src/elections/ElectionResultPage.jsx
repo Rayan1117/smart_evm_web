@@ -12,6 +12,7 @@ export default function ElectionResultPage() {
   const candidateNamesRef = useRef([]);
   const pinBitsRef = useRef([]);
   const categoryPinsRef = useRef([]);
+  const groupNamesRef = useRef({}); // ✅ added
 
   const theme = {
     bg: '#F3F4F6',
@@ -39,21 +40,26 @@ export default function ElectionResultPage() {
         const voteCount = JSON.parse(election.vote_count || "[]");
         const pinBits = JSON.parse(election.pin_bits || "[]");
         const categoryPins = JSON.parse(election.group_pins || "[]");
+        const groupNames = JSON.parse(election.group_names || "{}"); // ✅ added
 
         candidateNamesRef.current = candidateNames;
         pinBitsRef.current = pinBits;
         categoryPinsRef.current = categoryPins;
+        groupNamesRef.current = groupNames; // ✅ added
 
         const activeCandidates = [];
         let voteIdx = 0;
+
         candidateNames.forEach((name) => {
           while (voteIdx < pinBits.length && pinBits[voteIdx] === 0) voteIdx++;
           if (voteIdx >= voteCount.length) return;
+
           activeCandidates.push({
             candidateName: name,
-            category: categoryPins[voteIdx],
+            category: groupNames[String(categoryPins[voteIdx])] || categoryPins[voteIdx], // ✅ changed
             votes: voteCount[voteIdx] || 0
           });
+
           voteIdx++;
         });
 
@@ -68,10 +74,11 @@ export default function ElectionResultPage() {
           categoryMap[c.category] += c.votes;
         });
 
-        const categoryList = Object.entries(categoryMap).map(([catId, votes]) => ({
-          name: `Category ${catId}`,
+        const categoryList = Object.entries(categoryMap).map(([catName, votes]) => ({
+          name: catName, // ✅ already mapped name
           votes
         }));
+
         setCategoryResults(categoryList);
 
       } catch {
@@ -103,8 +110,13 @@ export default function ElectionResultPage() {
       </Header>
 
       <div style={{ maxWidth: '5xl', margin: '0 auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        
+        {/* Candidates */}
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>🧑‍💼 Candidates</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>
+            🧑‍💼 Candidates
+          </h2>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             {results.map((c, idx) => (
               <div key={idx} style={{ padding: '1rem', backgroundColor: '#DBEAFE', borderRadius: '1rem', boxShadow: theme.cardShadow }}>
@@ -116,13 +128,20 @@ export default function ElectionResultPage() {
           </div>
         </div>
 
+        {/* Total Votes */}
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '0.5rem' }}>📈 Total Votes</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '0.5rem' }}>
+            📈 Total Votes
+          </h2>
           <p style={{ fontSize: '1rem', fontWeight: 600 }}>{totalVotes}</p>
         </div>
 
+        {/* Category Votes */}
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>🏷️ Category Votes</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: theme.textPrimary, marginBottom: '1rem' }}>
+            🏷️ Category Votes
+          </h2>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             {categoryResults.map((c, idx) => (
               <div key={idx} style={{ padding: '1rem', backgroundColor: '#DCFCE7', borderRadius: '1rem', boxShadow: theme.cardShadow }}>
@@ -132,6 +151,7 @@ export default function ElectionResultPage() {
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );

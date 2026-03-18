@@ -17,10 +17,10 @@ export default function ElectionDetailsModal({ election, trigger, ongoingElectio
     pinBits = JSON.parse(election.pin_bits || '[]');
     groupPins = JSON.parse(election.group_pins || '[]');
     groupNames = JSON.parse(election.group_names || '{}');
-  } catch (err) {}
+  } catch (err) { }
 
   console.log(election);
-  
+
 
   const mappedCandidates = [];
   let candidateIdx = 0;
@@ -35,6 +35,7 @@ export default function ElectionDetailsModal({ election, trigger, ongoingElectio
   }
 
   const isOngoing = election.election_id === ongoingElectionId;
+  const role = localStorage.getItem("evm.role");
 
   return (
     <Modal
@@ -43,19 +44,19 @@ export default function ElectionDetailsModal({ election, trigger, ongoingElectio
       width={800}
       footer={
         <>
-          {isOngoing ? (
+          {isOngoing && role === 'admin' ? (
             <>
-              <Button
+              ( <Button
                 type="primary"
                 onClick={() => navigate(`/election-reset/1/?electionId=${election.election_id}`)}
               >
                 Resume Election
-              </Button>
+              </Button>)
               <Button onClick={() => navigate("/election-live-stats/" + election.election_id)}>View Live Election</Button>
             </>
-          ) : election.isEnd ? (
+          ) : isOngoing ? (<Button onClick={() => navigate("/election-live-stats/" + election.election_id)}>View Live Election</Button>) : election.isEnd ? (
             <Button onClick={() => navigate("/election-result/" + election.election_id)}>View Result</Button>
-          ) : (
+          ) : role === 'admin' && (
             <Button
               type="primary"
               disabled={!!ongoingElectionId}
